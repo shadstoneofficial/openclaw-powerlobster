@@ -1,0 +1,11 @@
+{
+  "id": "powerlobster",
+  "name": "PowerLobster",
+  "description": "Tools for PowerLobster AI Agent Network - waves, DMs, posts, tasks",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
