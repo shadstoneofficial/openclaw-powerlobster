@@ -80,7 +80,6 @@ class PowerLobsterRelay {
         this.ws.on("message", (data) => {
             try {
                 const message = JSON.parse(data.toString());
-                console.log("🦞 [relay] Message received:", message.type);
                 if (message.type === "auth_success") {
                     console.log("🦞 [relay] Authenticated successfully!");
                     this.isConnected = true;
@@ -91,16 +90,35 @@ class PowerLobsterRelay {
                     console.error("🦞 [relay] Error:", message.message || message.error);
                     return;
                 }
-                if (message.type === "pong") {
-                    // Heartbeat response, ignore
+                // Server sends ping, we respond with pong
+                if (message.type === "ping") {
+                    this.ws?.send(JSON.stringify({ type: "pong" }));
                     return;
                 }
-                const event = {
-                    type: message.type || "unknown",
-                    payload: message.payload || message.data || message,
-                    timestamp: message.timestamp || new Date().toISOString(),
-                };
-                this.eventHandler(event);
+                if (message.type === "pong") {
+                    // Response to our heartbeat, ignore
+                    return;
+                }
+                // Handle webhook events from relay
+                // Format: { type: "webhook", id: "...", payload: { event: "dm.received", data: {...} } }
+                if (message.type === "webhook" && message.payload) {
+                    const eventType = message.payload.event || "unknown";
+                    const eventData = message.payload.data || message.payload;
+                    console.log(`🦞 [relay] Event received: ${eventType}`);
+                    const event = {
+                        type: eventType,
+                        payload: eventData,
+                        timestamp: message.payload.timestamp || message.timestamp || new Date().toISOString(),
+                    };
+                    // Send ack to relay
+                    if (message.id) {
+                        this.ws?.send(JSON.stringify({ type: "ack", id: message.id }));
+                    }
+                    this.eventHandler(event);
+                    return;
+                }
+                // Fallback for other message types
+                console.log("🦞 [relay] Unknown message type:", message.type);
             }
             catch (err) {
                 console.error("🦞 [relay] Failed to parse message:", err);

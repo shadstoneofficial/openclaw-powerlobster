@@ -51,36 +51,45 @@ function formatEventMessage(event: RelayEvent): string {
     case "task.assigned":
       return `🦞 **New Task Assigned**\n` +
         `Task: ${payload.title || payload.task_id}\n` +
-        `From: ${payload.assignor || "unknown"}\n` +
+        `From: ${payload.assignor || payload.assigned_by || "unknown"}\n` +
         `Description: ${payload.description || "No description"}\n` +
-        `Due: ${payload.due_date || "No deadline"}`;
+        `Due: ${payload.due_date || "No deadline"}\n` +
+        `Link: ${payload.permalink || ""}`;
     
     case "wave.scheduled":
       return `🦞 **Wave Scheduled**\n` +
         `Wave ID: ${payload.wave_id}\n` +
-        `Time: ${payload.scheduled_time || "Now"}\n` +
+        `Time: ${payload.scheduled_time || payload.start_time || "Now"}\n` +
         `Type: ${payload.wave_type || "work"}`;
     
     case "wave.reminder":
       return `🦞 **Wave Reminder**\n` +
         `Wave ID: ${payload.wave_id}\n` +
-        `Starts in: ${payload.minutes_until || "soon"} minutes\n` +
+        `Starts in: ${payload.minutes_until || "15"} minutes\n` +
         `Don't forget to complete your wave!`;
     
     case "dm.received":
-      return `🦞 **New DM from @${payload.sender || "unknown"}**\n` +
+      return `🦞 **New DM from @${payload.sender_handle || payload.sender || "unknown"}**\n` +
+        `Message ID: ${payload.message_id || "unknown"}\n` +
         `${payload.content || payload.message || ""}`;
     
     case "mention":
-      return `🦞 **You were mentioned by @${payload.author || "unknown"}**\n` +
+      return `🦞 **You were mentioned by @${payload.author_handle || payload.author || "unknown"}**\n` +
         `${payload.content || payload.text || ""}\n` +
-        `Context: ${payload.context || "post"}`;
+        `Post: ${payload.permalink || ""}`;
     
     case "task.comment":
       return `🦞 **New Comment on Task**\n` +
         `Task: ${payload.task_title || payload.task_id}\n` +
-        `From: ${payload.commenter || "unknown"}\n` +
-        `Comment: ${payload.content || ""}`;
+        `From: @${payload.commenter_handle || payload.commenter || "unknown"}\n` +
+        `Comment: ${payload.content || ""}\n` +
+        `Link: ${payload.permalink || ""}`;
+    
+    case "service_order":
+      return `🦞 **New Service Order!**\n` +
+        `From: @${payload.buyer_handle || payload.buyer || "unknown"}\n` +
+        `Service: ${payload.service_name || payload.service_id}\n` +
+        `Amount: ${payload.amount || "N/A"}`;
     
     default:
       return `🦞 **PowerLobster Event: ${type}**\n` +
