@@ -12,13 +12,21 @@
  * will auto-provision them via POST /api/agent/relay.
  */
 
-import { Type } from "@sinclair/typebox";
 import { 
   PowerLobsterRelay, 
   RelayEvent, 
   RelayConfig,
   provisionRelayCredentials 
 } from "./src/relay-client.js";
+
+// Simple schema helper (replaces typebox)
+const Schema = {
+  Object: (props: Record<string, any>) => ({ type: "object", properties: props }),
+  String: (opts?: any) => ({ type: "string", ...opts }),
+  Optional: (schema: any) => ({ ...schema, optional: true }),
+  Union: (schemas: any[]) => ({ anyOf: schemas }),
+  Literal: (val: any) => ({ const: val }),
+};
 
 // PowerLobster API functions
 async function callPowerLobsterAPI(
@@ -136,28 +144,48 @@ export default function register(api: any) {
         }
       }
 
-      const handleEvent = (event: RelayEvent) => {
+      const handleEvent = async (event: RelayEvent) => {
         const message = formatEventMessage(event);
         console.log(`🦞 [relay] Processing event: ${event.type}`);
+        console.log(`🦞 [relay] Event message:\n${message}`);
         
-        // Inject event into OpenClaw session
-        // This triggers the agent to respond to the event
-        if (api.injectMessage) {
-          api.injectMessage({
-            source: "powerlobster",
-            type: event.type,
-            content: message,
-            metadata: event.payload,
+        // Get hook token from env
+        const hookToken = process.env.OPENCLAW_HOOKS_TOKEN || process.env.POWERLOBSTER_HOOK_TOKEN;
+        const gatewayPort = process.env.OPENCLAW_GATEWAY_PORT || "18789";
+        const gatewayHost = process.env.OPENCLAW_GATEWAY_HOST || "127.0.0.1";
+        
+        if (!hookToken) {
+          console.log("🦞 [relay] No hook token configured - cannot trigger agent");
+          console.log("🦞 [relay] Set OPENCLAW_HOOKS_TOKEN or POWERLOBSTER_HOOK_TOKEN");
+          return;
+        }
+        
+        // Trigger agent via OpenClaw hooks endpoint
+        try {
+          const hookUrl = `http://${gatewayHost}:${gatewayPort}/hooks/agent`;
+          console.log(`🦞 [relay] Triggering agent via ${hookUrl}`);
+          
+          const response = await fetch(hookUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${hookToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: message,
+              name: "PowerLobster",
+              wakeMode: "now",
+            }),
           });
-        } else if (api.triggerSession) {
-          api.triggerSession({
-            channel: "powerlobster",
-            message: message,
-            metadata: { eventType: event.type, ...event.payload },
-          });
-        } else {
-          // Fallback: log for now, will need proper API
-          console.log(`🦞 [relay] Event message:\n${message}`);
+          
+          if (response.ok) {
+            console.log(`🦞 [relay] Agent triggered successfully (${response.status})`);
+          } else {
+            const errorText = await response.text();
+            console.error(`🦞 [relay] Failed to trigger agent: ${response.status} - ${errorText}`);
+          }
+        } catch (err: any) {
+          console.error(`🦞 [relay] Error triggering agent: ${err.message}`);
         }
       };
 
@@ -178,9 +206,11 @@ export default function register(api: any) {
   api.registerTool({
     name: "powerlobster_wave_complete",
     description: "Mark a PowerLobster wave slot as complete after finishing scheduled work.",
-    parameters: Type.Object({
-      wave_id: Type.String({ description: "Wave ID (format: YYYYMMDDHHhandle)" }),
-      proof: Type.Optional(Type.String({ description: "Proof URL or work summary" })),
+    parameters: Schema.Object({
+      wave_id: Schema.String({ description: "Wave ID (format: YYYYMMDDHHhandle)" }),
+      proof: Schema.Optional(Schema.String({ description: "Proof URL or work summary" })),
+  Union: (schemas: any[]) => ({ anyOf: schemas }),
+  Literal: (val: any) => ({ const: val }),
     }),
     async execute(_id: string, params: any) {
       const apiKey = getApiKey();
@@ -200,9 +230,9 @@ export default function register(api: any) {
   api.registerTool({
     name: "powerlobster_dm",
     description: "Send a direct message to a user on PowerLobster.",
-    parameters: Type.Object({
-      recipient: Type.String({ description: "Recipient handle (e.g., billy-beard)" }),
-      message: Type.String({ description: "Message content" }),
+    parameters: Schema.Object({
+      recipient: Schema.String({ description: "Recipient handle (e.g., billy-beard)" }),
+      message: Schema.String({ description: "Message content" }),
     }),
     async execute(_id: string, params: any) {
       const apiKey = getApiKey();
@@ -218,10 +248,14 @@ export default function register(api: any) {
   api.registerTool({
     name: "powerlobster_post",
     description: "Create a post on PowerLobster feed.",
-    parameters: Type.Object({
-      content: Type.String({ description: "Post content" }),
-      project_id: Type.Optional(Type.String({ description: "Link to project" })),
-      task_id: Type.Optional(Type.String({ description: "Link to task (creates draft)" })),
+    parameters: Schema.Object({
+      content: Schema.String({ description: "Post content" }),
+      project_id: Schema.Optional(Schema.String({ description: "Link to project" })),
+  Union: (schemas: any[]) => ({ anyOf: schemas }),
+  Literal: (val: any) => ({ const: val }),
+      task_id: Schema.Optional(Schema.String({ description: "Link to task (creates draft)" })),
+  Union: (schemas: any[]) => ({ anyOf: schemas }),
+  Literal: (val: any) => ({ const: val }),
     }),
     async execute(_id: string, params: any) {
       const apiKey = getApiKey();
@@ -238,9 +272,9 @@ export default function register(api: any) {
   api.registerTool({
     name: "powerlobster_task_comment",
     description: "Add a comment to a PowerLobster task.",
-    parameters: Type.Object({
-      task_id: Type.String({ description: "Task UUID" }),
-      comment: Type.String({ description: "Comment content" }),
+    parameters: Schema.Object({
+      task_id: Schema.String({ description: "Task UUID" }),
+      comment: Schema.String({ description: "Comment content" }),
     }),
     async execute(_id: string, params: any) {
       const apiKey = getApiKey();
@@ -255,13 +289,13 @@ export default function register(api: any) {
   api.registerTool({
     name: "powerlobster_task_update",
     description: "Update a PowerLobster task status.",
-    parameters: Type.Object({
-      task_id: Type.String({ description: "Task UUID" }),
-      status: Type.Union([
-        Type.Literal("pending"),
-        Type.Literal("in_progress"),
-        Type.Literal("completed"),
-        Type.Literal("cancelled"),
+    parameters: Schema.Object({
+      task_id: Schema.String({ description: "Task UUID" }),
+      status: Schema.Union([
+        Schema.Literal("pending"),
+        Schema.Literal("in_progress"),
+        Schema.Literal("completed"),
+        Schema.Literal("cancelled"),
       ]),
     }),
     async execute(_id: string, params: any) {
@@ -277,7 +311,7 @@ export default function register(api: any) {
   api.registerTool({
     name: "powerlobster_relay_status",
     description: "Check if the PowerLobster relay connection is active.",
-    parameters: Type.Object({}),
+    parameters: Schema.Object({}),
     async execute() {
       const isActive = relay?.isActive() ?? false;
       const relayId = relay?.getRelayId() ?? "none";

@@ -111,29 +111,45 @@ function register(api) {
                     return;
                 }
             }
-            const handleEvent = (event) => {
+            const handleEvent = async (event) => {
                 const message = formatEventMessage(event);
                 console.log(`🦞 [relay] Processing event: ${event.type}`);
-                // Inject event into OpenClaw session
-                // This triggers the agent to respond to the event
-                if (api.injectMessage) {
-                    api.injectMessage({
-                        source: "powerlobster",
-                        type: event.type,
-                        content: message,
-                        metadata: event.payload,
-                    });
+                console.log(`🦞 [relay] Event message:\n${message}`);
+                // Get hook token from env
+                const hookToken = process.env.OPENCLAW_HOOKS_TOKEN || process.env.POWERLOBSTER_HOOK_TOKEN;
+                const gatewayPort = process.env.OPENCLAW_GATEWAY_PORT || "18789";
+                const gatewayHost = process.env.OPENCLAW_GATEWAY_HOST || "127.0.0.1";
+                if (!hookToken) {
+                    console.log("🦞 [relay] No hook token configured - cannot trigger agent");
+                    console.log("🦞 [relay] Set OPENCLAW_HOOKS_TOKEN or POWERLOBSTER_HOOK_TOKEN");
+                    return;
                 }
-                else if (api.triggerSession) {
-                    api.triggerSession({
-                        channel: "powerlobster",
-                        message: message,
-                        metadata: { eventType: event.type, ...event.payload },
+                // Trigger agent via OpenClaw hooks endpoint
+                try {
+                    const hookUrl = `http://${gatewayHost}:${gatewayPort}/hooks/agent`;
+                    console.log(`🦞 [relay] Triggering agent via ${hookUrl}`);
+                    const response = await fetch(hookUrl, {
+                        method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${hookToken}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            name: "PowerLobster",
+                            wakeMode: "now",
+                        }),
                     });
+                    if (response.ok) {
+                        console.log(`🦞 [relay] Agent triggered successfully (${response.status})`);
+                    }
+                    else {
+                        const errorText = await response.text();
+                        console.error(`🦞 [relay] Failed to trigger agent: ${response.status} - ${errorText}`);
+                    }
                 }
-                else {
-                    // Fallback: log for now, will need proper API
-                    console.log(`🦞 [relay] Event message:\n${message}`);
+                catch (err) {
+                    console.error(`🦞 [relay] Error triggering agent: ${err.message}`);
                 }
             };
             const config = {
