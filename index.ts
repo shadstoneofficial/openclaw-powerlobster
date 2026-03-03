@@ -2,10 +2,23 @@
  * OpenClaw PowerLobster Plugin
  * 
  * Provides tools + relay connection for PowerLobster AI Agent Network.
+ * 
+ * Configuration:
+ *   - POWERLOBSTER_API_KEY (required): Agent API key from PowerLobster
+ *   - POWERLOBSTER_RELAY_ID (optional): Override auto-provisioned relay ID
+ *   - POWERLOBSTER_RELAY_API_KEY (optional): Override auto-provisioned relay key
+ * 
+ * On startup, if relay credentials are not provided via env vars, the plugin
+ * will auto-provision them via POST /api/agent/relay.
  */
 
 import { Type } from "@sinclair/typebox";
-import { PowerLobsterRelay, RelayEvent, RelayConfig } from "./src/relay-client.js";
+import { 
+  PowerLobsterRelay, 
+  RelayEvent, 
+  RelayConfig,
+  provisionRelayCredentials 
+} from "./src/relay-client.js";
 
 // PowerLobster API functions
 async function callPowerLobsterAPI(
@@ -86,12 +99,34 @@ export default function register(api: any) {
     return key;
   };
 
-  // Initialize relay connection
-  try {
-    const apiKey = process.env.POWERLOBSTER_API_KEY;
-    const relayId = process.env.POWERLOBSTER_RELAY_ID;
-    
-    if (apiKey && relayId) {
+  // Initialize relay connection (async IIFE)
+  (async () => {
+    try {
+      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      
+      if (!apiKey) {
+        console.log("🦞 [relay] No POWERLOBSTER_API_KEY found - plugin disabled");
+        return;
+      }
+
+      // Check for manual override via env vars
+      let relayId = process.env.POWERLOBSTER_RELAY_ID;
+      let relayApiKey = process.env.POWERLOBSTER_RELAY_API_KEY;
+
+      // Auto-provision if not provided
+      if (!relayId || !relayApiKey) {
+        try {
+          const credentials = await provisionRelayCredentials(apiKey);
+          relayId = credentials.relayId;
+          relayApiKey = credentials.relayApiKey;
+          console.log(`🦞 [relay] Webhook URL: ${credentials.webhookUrl}`);
+        } catch (err: any) {
+          console.error("🦞 [relay] Auto-provision failed:", err.message);
+          console.log("🦞 [relay] Tools still available, but relay disabled");
+          return;
+        }
+      }
+
       const handleEvent = (event: RelayEvent) => {
         const message = formatEventMessage(event);
         console.log(`🦞 [relay] Processing event: ${event.type}`);
@@ -118,21 +153,17 @@ export default function register(api: any) {
       };
 
       const config: RelayConfig = {
-        apiKey,
         relayId,
+        relayApiKey,
       };
       
       relay = new PowerLobsterRelay(config, handleEvent);
       relay.connect();
       console.log("🦞 [relay] Relay client initialized");
-    } else if (apiKey && !relayId) {
-      console.log("🦞 [relay] No POWERLOBSTER_RELAY_ID found - relay disabled (tools still work)");
-    } else {
-      console.log("🦞 [relay] No API key found, plugin disabled");
+    } catch (err: any) {
+      console.error("🦞 [relay] Failed to initialize:", err.message);
     }
-  } catch (err: any) {
-    console.error("🦞 [relay] Failed to initialize:", err.message);
-  }
+  })();
 
   // Tool: Complete Wave
   api.registerTool({
@@ -240,11 +271,12 @@ export default function register(api: any) {
     parameters: Type.Object({}),
     async execute() {
       const isActive = relay?.isActive() ?? false;
+      const relayId = relay?.getRelayId() ?? "none";
       return { 
         content: [{ 
           type: "text", 
           text: isActive 
-            ? "✅ Relay connected to PowerLobster" 
+            ? `✅ Relay connected (${relayId})` 
             : "❌ Relay not connected" 
         }] 
       };

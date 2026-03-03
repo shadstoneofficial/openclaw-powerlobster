@@ -14,9 +14,58 @@ export interface RelayEvent {
 export type EventHandler = (event: RelayEvent) => void;
 
 export interface RelayConfig {
-  apiKey: string;
-  relayId: string;  // Required - unique ID for this agent in PowerLobster DB
+  relayId: string;      // Agent relay ID (agt_xxx)
+  relayApiKey: string;  // Relay-specific API key (sk_xxx)
   relayUrl?: string;
+}
+
+export interface RelayCredentials {
+  relayId: string;
+  relayApiKey: string;
+  webhookUrl: string;
+}
+
+interface RelayProvisionResponse {
+  status: string;
+  relay_id: string;
+  relay_api_key: string;
+  webhook_url: string;
+  message?: string;
+}
+
+/**
+ * Self-provision relay credentials from PowerLobster API.
+ * This creates/retrieves the relay entry for this agent.
+ */
+export async function provisionRelayCredentials(agentApiKey: string): Promise<RelayCredentials> {
+  console.log("🦞 [relay] Provisioning relay credentials...");
+  
+  const response = await fetch("https://powerlobster.com/api/agent/relay", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${agentApiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to provision relay: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json() as RelayProvisionResponse;
+  
+  if (data.status !== "success") {
+    throw new Error(`Relay provisioning failed: ${data.message || "unknown error"}`);
+  }
+
+  console.log(`🦞 [relay] Provisioned: relay_id=${data.relay_id}`);
+  
+  return {
+    relayId: data.relay_id,
+    relayApiKey: data.relay_api_key,
+    webhookUrl: data.webhook_url,
+  };
 }
 
 export class PowerLobsterRelay {
@@ -44,8 +93,8 @@ export class PowerLobsterRelay {
       this.ws.close();
     }
 
-    if (!this.config.relayId) {
-      console.error("🦞 [relay] No relay_id configured - cannot connect");
+    if (!this.config.relayId || !this.config.relayApiKey) {
+      console.error("🦞 [relay] Missing relay credentials - cannot connect");
       return;
     }
 
@@ -58,10 +107,11 @@ export class PowerLobsterRelay {
       this.currentReconnectInterval = this.reconnectInterval;
 
       // Send auth message per PowerLobster protocol
+      // Use relay_api_key for auth (NOT the main agent API key)
       this.ws?.send(JSON.stringify({
         type: "auth",
         relay_id: this.config.relayId,
-        api_key: this.config.apiKey,
+        api_key: this.config.relayApiKey,
       }));
     });
 
@@ -77,7 +127,7 @@ export class PowerLobsterRelay {
           return;
         }
 
-        if (message.type === "error") {
+        if (message.type === "auth_error" || message.type === "error") {
           console.error("🦞 [relay] Error:", message.message || message.error);
           return;
         }
@@ -149,5 +199,9 @@ export class PowerLobsterRelay {
 
   isActive(): boolean {
     return this.isConnected;
+  }
+
+  getRelayId(): string {
+    return this.config.relayId;
   }
 }

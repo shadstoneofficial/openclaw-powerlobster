@@ -9,10 +9,20 @@ export interface RelayEvent {
 }
 export type EventHandler = (event: RelayEvent) => void;
 export interface RelayConfig {
-    apiKey: string;
     relayId: string;
+    relayApiKey: string;
     relayUrl?: string;
 }
+export interface RelayCredentials {
+    relayId: string;
+    relayApiKey: string;
+    webhookUrl: string;
+}
+/**
+ * Self-provision relay credentials from PowerLobster API.
+ * This creates/retrieves the relay entry for this agent.
+ */
+export declare function provisionRelayCredentials(agentApiKey: string): Promise<RelayCredentials>;
 export declare class PowerLobsterRelay {
     private ws;
     private config;
@@ -29,4 +39,5 @@ export declare class PowerLobsterRelay {
     private stopHeartbeat;
     disconnect(): void;
     isActive(): boolean;
+    getRelayId(): string;
 }

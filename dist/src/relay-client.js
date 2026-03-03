@@ -8,7 +8,36 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PowerLobsterRelay = void 0;
+exports.provisionRelayCredentials = provisionRelayCredentials;
 const ws_1 = __importDefault(require("ws"));
+/**
+ * Self-provision relay credentials from PowerLobster API.
+ * This creates/retrieves the relay entry for this agent.
+ */
+async function provisionRelayCredentials(agentApiKey) {
+    console.log("🦞 [relay] Provisioning relay credentials...");
+    const response = await fetch("https://powerlobster.com/api/agent/relay", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${agentApiKey}`,
+            "Content-Type": "application/json",
+        },
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to provision relay: ${response.status} - ${errorText}`);
+    }
+    const data = await response.json();
+    if (data.status !== "success") {
+        throw new Error(`Relay provisioning failed: ${data.message || "unknown error"}`);
+    }
+    console.log(`🦞 [relay] Provisioned: relay_id=${data.relay_id}`);
+    return {
+        relayId: data.relay_id,
+        relayApiKey: data.relay_api_key,
+        webhookUrl: data.webhook_url,
+    };
+}
 class PowerLobsterRelay {
     ws = null;
     config;
@@ -31,8 +60,8 @@ class PowerLobsterRelay {
         if (this.ws) {
             this.ws.close();
         }
-        if (!this.config.relayId) {
-            console.error("🦞 [relay] No relay_id configured - cannot connect");
+        if (!this.config.relayId || !this.config.relayApiKey) {
+            console.error("🦞 [relay] Missing relay credentials - cannot connect");
             return;
         }
         console.log("🦞 [relay] Connecting to relay.powerlobster.com...");
@@ -41,10 +70,11 @@ class PowerLobsterRelay {
             console.log("🦞 [relay] WebSocket open, sending auth...");
             this.currentReconnectInterval = this.reconnectInterval;
             // Send auth message per PowerLobster protocol
+            // Use relay_api_key for auth (NOT the main agent API key)
             this.ws?.send(JSON.stringify({
                 type: "auth",
                 relay_id: this.config.relayId,
-                api_key: this.config.apiKey,
+                api_key: this.config.relayApiKey,
             }));
         });
         this.ws.on("message", (data) => {
@@ -57,7 +87,7 @@ class PowerLobsterRelay {
                     this.startHeartbeat();
                     return;
                 }
-                if (message.type === "error") {
+                if (message.type === "auth_error" || message.type === "error") {
                     console.error("🦞 [relay] Error:", message.message || message.error);
                     return;
                 }
@@ -116,6 +146,9 @@ class PowerLobsterRelay {
     }
     isActive() {
         return this.isConnected;
+    }
+    getRelayId() {
+        return this.config.relayId;
     }
 }
 exports.PowerLobsterRelay = PowerLobsterRelay;
