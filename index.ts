@@ -174,6 +174,11 @@ function connectRelay(credentials: RelayCredentials): void {
         return;
       }
       
+      // Filter out ping events - they don't need agent handling
+      if (msg.type === "ping") {
+        return;
+      }
+      
       // Handle PowerLobster events
       console.log(`🦞 [relay] Event received: ${msg.type}`, JSON.stringify(msg.data || msg));
       triggerAgent(msg);
