@@ -84,7 +84,7 @@ async function provisionRelay(apiKey: string): Promise<RelayCredentials> {
     throw new Error(`Failed to provision relay: ${response.status} - ${text}`);
   }
   
-  return response.json();
+  return response.json() as Promise<RelayCredentials>;
 }
 
 // Trigger agent via OpenClaw hooks
