@@ -172,7 +172,7 @@ function connectRelay(credentials: RelayCredentials): void {
       }
       
       // Handle PowerLobster events
-      console.log(`🦞 [relay] Event received: ${msg.type}`);
+      console.log(`🦞 [relay] Event received: ${msg.type}`, JSON.stringify(msg.data || msg));
       triggerAgent(msg);
       
     } catch (error) {
