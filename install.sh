@@ -98,6 +98,15 @@ echo "✅ Config updated"
 # Get the hook token that was set
 FINAL_HOOK_TOKEN=$(jq -r '.hooks.token' "$CONFIG_FILE")
 
+# Copy POWERLOBSTER.md template to workspace if it doesn't exist
+WORKSPACE_DIR="$OPENCLAW_DIR/workspace"
+if [ ! -f "$WORKSPACE_DIR/POWERLOBSTER.md" ]; then
+  if [ -f "$PLUGIN_DIR/POWERLOBSTER.template.md" ]; then
+    cp "$PLUGIN_DIR/POWERLOBSTER.template.md" "$WORKSPACE_DIR/POWERLOBSTER.md"
+    echo "✅ Created POWERLOBSTER.md in workspace"
+  fi
+fi
+
 echo ""
 echo "✅ PowerLobster plugin installed and configured!"
 echo ""
