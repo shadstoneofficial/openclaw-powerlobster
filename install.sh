@@ -4,8 +4,7 @@
 
 set -e
 
-PLUGIN_NAME="@ckgworks/openclaw-powerlobster"
-PLUGIN_VERSION="${POWERLOBSTER_VERSION:-latest}"
+REPO_URL="https://github.com/shadstoneofficial/openclaw-powerlobster"
 OPENCLAW_DIR="${OPENCLAW_DIR:-$HOME/.openclaw}"
 EXTENSIONS_DIR="$OPENCLAW_DIR/extensions"
 PLUGIN_DIR="$EXTENSIONS_DIR/powerlobster"
@@ -13,8 +12,8 @@ CONFIG_FILE="$OPENCLAW_DIR/openclaw.json"
 
 echo "🦞 PowerLobster Plugin Installer"
 echo "================================"
-echo "Version: $PLUGIN_VERSION"
-echo "Target:  $PLUGIN_DIR"
+echo "Source: $REPO_URL"
+echo "Target: $PLUGIN_DIR"
 echo ""
 
 # Check dependencies
@@ -31,16 +30,30 @@ if ! command -v jq &> /dev/null; then
     }
 fi
 
-# Create extensions directory
-mkdir -p "$PLUGIN_DIR"
+if ! command -v git &> /dev/null; then
+    echo "📦 Installing git..."
+    apt-get update -qq && apt-get install -y -qq git || {
+        echo "❌ Could not install git. Please install it manually."
+        exit 1
+    }
+fi
 
-# Install plugin
-echo "📦 Installing $PLUGIN_NAME@$PLUGIN_VERSION..."
-npm install "$PLUGIN_NAME@$PLUGIN_VERSION" --prefix "$PLUGIN_DIR" --no-save 2>/dev/null
+# Clean previous installation
+if [ -d "$PLUGIN_DIR" ]; then
+    echo "🧹 Removing previous installation..."
+    rm -rf "$PLUGIN_DIR"
+fi
+
+# Clone and install
+echo "📦 Installing plugin from GitHub..."
+git clone --depth 1 "$REPO_URL.git" "$PLUGIN_DIR" 2>/dev/null
+
+cd "$PLUGIN_DIR"
+npm install --production 2>/dev/null
 
 # Verify installation
-if [ ! -f "$PLUGIN_DIR/node_modules/$PLUGIN_NAME/dist/index.js" ]; then
-    echo "❌ Installation failed"
+if [ ! -f "$PLUGIN_DIR/dist/index.js" ]; then
+    echo "❌ Installation failed - dist/index.js not found"
     exit 1
 fi
 echo "✅ Plugin installed"
@@ -75,7 +88,7 @@ UPDATED_CONFIG=$(jq --arg pluginDir "$PLUGIN_DIR" --arg hookToken "$HOOK_TOKEN" 
   # Add plugin entry
   .plugins.entries.powerlobster = {
     "enabled": true,
-    "path": ($pluginDir + "/node_modules/@ckgworks/openclaw-powerlobster")
+    "path": $pluginDir
   }
 ' "$CONFIG_FILE")
 
@@ -88,13 +101,19 @@ FINAL_HOOK_TOKEN=$(jq -r '.hooks.token' "$CONFIG_FILE")
 echo ""
 echo "✅ PowerLobster plugin installed and configured!"
 echo ""
-echo "📋 Next steps:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📋 NEXT STEPS:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "   1. Set your API key:"
-echo "      echo \"POWERLOBSTER_API_KEY=<your-key>\" >> $OPENCLAW_DIR/.env"
-echo "      echo \"POWERLOBSTER_HOOK_TOKEN=$FINAL_HOOK_TOKEN\" >> $OPENCLAW_DIR/.env"
+echo "1. Set your API key:"
 echo ""
-echo "   2. Restart OpenClaw:"
-echo "      openclaw gateway restart"
+echo "   echo \"POWERLOBSTER_API_KEY=<your-api-key>\" >> $OPENCLAW_DIR/.env"
+echo "   echo \"POWERLOBSTER_HOOK_TOKEN=$FINAL_HOOK_TOKEN\" >> $OPENCLAW_DIR/.env"
 echo ""
-echo "🦞 That's it! Your agent will now receive PowerLobster events."
+echo "2. Restart OpenClaw:"
+echo ""
+echo "   openclaw gateway restart"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🦞 That's it! Your agent will receive PowerLobster events."
+echo ""
