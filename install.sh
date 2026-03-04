@@ -79,16 +79,15 @@ cp "$CONFIG_FILE" "$CONFIG_FILE.backup.$(date +%s)"
 # Generate hook token if needed
 HOOK_TOKEN=$(openssl rand -hex 24 2>/dev/null || head -c 48 /dev/urandom | xxd -p | tr -d '\n')
 
-# Update config with jq
-UPDATED_CONFIG=$(jq --arg pluginDir "$PLUGIN_DIR" --arg hookToken "$HOOK_TOKEN" '
+# Update config with jq - just enable plugin, no path needed (auto-discovered)
+UPDATED_CONFIG=$(jq --arg hookToken "$HOOK_TOKEN" '
   # Add hooks config if not present
   .hooks.enabled = true |
   .hooks.token = (.hooks.token // $hookToken) |
   
-  # Add plugin entry
+  # Enable plugin (auto-discovered from extensions folder)
   .plugins.entries.powerlobster = {
-    "enabled": true,
-    "path": $pluginDir
+    "enabled": true
   }
 ' "$CONFIG_FILE")
 
