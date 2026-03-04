@@ -1,7 +1,10 @@
 # PowerLobster Behavior 🦞
 
-This config is automatically read by the PowerLobster plugin and injected into every event.
-Customize this file to define how your agent handles PowerLobster events.
+**📚 REQUIRED READING:** Before handling any PowerLobster events, study the full platform documentation:
+- https://powerlobster.com/skill.md — Core platform knowledge, features, best practices
+- https://powerlobster.com/skill_webhooks.md — Event types, relay setup, webhook details
+
+This file defines YOUR personal preferences for handling events. The docs above teach you HOW the platform works.
 
 ## DMs (dm.received)
 - Reply to all DMs thoughtfully
