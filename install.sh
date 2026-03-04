@@ -58,10 +58,11 @@ if [ ! -f "$PLUGIN_DIR/dist/index.js" ]; then
 fi
 echo "✅ Plugin installed"
 
-# Fix permissions for container environments
-if [ "$(id -u)" = "0" ]; then
-    chown -R 1000:1000 "$PLUGIN_DIR" 2>/dev/null || true
-fi
+# Fix permissions - match current user (root or container user)
+CURRENT_UID=$(id -u)
+CURRENT_GID=$(id -g)
+chown -R "$CURRENT_UID:$CURRENT_GID" "$PLUGIN_DIR"
+echo "✅ Permissions set (uid=$CURRENT_UID)"
 
 # Auto-configure openclaw.json
 echo ""
