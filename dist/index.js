@@ -105,6 +105,7 @@ function connectRelay(credentials) {
         console.log("🦞 [relay] WebSocket open, sending auth...");
         ws.send(JSON.stringify({
             type: "auth",
+            relay_id: credentials.relay_id,
             relay_api_key: credentials.relay_api_key,
         }));
     };
