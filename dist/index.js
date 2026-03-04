@@ -8,14 +8,22 @@
  *   - POWERLOBSTER_API_KEY (required): Agent API key from PowerLobster
  *   - POWERLOBSTER_RELAY_ID (optional): Override auto-provisioned relay ID
  *   - POWERLOBSTER_RELAY_API_KEY (optional): Override auto-provisioned relay key
+ *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
  *
  * On startup, if relay credentials are not provided via env vars, the plugin
  * will auto-provision them via POST /api/agent/relay.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = register;
-const typebox_1 = require("@sinclair/typebox");
 const relay_client_js_1 = require("./src/relay-client.js");
+// Simple schema helper (replaces typebox)
+const Schema = {
+    Object: (props) => ({ type: "object", properties: props }),
+    String: (opts) => ({ type: "string", ...opts }),
+    Optional: (schema) => ({ ...schema, optional: true }),
+    Union: (schemas) => ({ anyOf: schemas }),
+    Literal: (val) => ({ const: val }),
+};
 // PowerLobster API functions
 async function callPowerLobsterAPI(apiKey, endpoint, method = "GET", body) {
     const response = await fetch(`https://powerlobster.com/api/agent${endpoint}`, {
@@ -42,6 +50,9 @@ function formatEventMessage(event) {
                 `Description: ${payload.description || "No description"}\n` +
                 `Due: ${payload.due_date || "No deadline"}\n` +
                 `Link: ${payload.permalink || ""}`;
+        case "wave.started":
+            return `🦞 **PowerLobster Event: wave.started**\n` +
+                JSON.stringify(payload, null, 2);
         case "wave.scheduled":
             return `🦞 **Wave Scheduled**\n` +
                 `Wave ID: ${payload.wave_id}\n` +
@@ -50,8 +61,8 @@ function formatEventMessage(event) {
         case "wave.reminder":
             return `🦞 **Wave Reminder**\n` +
                 `Wave ID: ${payload.wave_id}\n` +
-                `Starts in: ${payload.minutes_until || "15"} minutes\n` +
-                `Don't forget to complete your wave!`;
+                `Starts in: ${payload.minutes_until || "60"} minutes\n` +
+                `Task: ${payload.task_title || payload.task_id || "unknown"}`;
         case "dm.received":
             return `🦞 **New DM from @${payload.sender_handle || payload.sender || "unknown"}**\n` +
                 `Message ID: ${payload.message_id || "unknown"}\n` +
@@ -91,7 +102,7 @@ function register(api) {
         try {
             const apiKey = process.env.POWERLOBSTER_API_KEY;
             if (!apiKey) {
-                console.log("🦞 [relay] No POWERLOBSTER_API_KEY found - plugin disabled");
+                console.log("🦞 [relay] No POWERLOBSTER_API_KEY found - relay disabled (tools still available)");
                 return;
             }
             // Check for manual override via env vars
@@ -168,9 +179,9 @@ function register(api) {
     api.registerTool({
         name: "powerlobster_wave_complete",
         description: "Mark a PowerLobster wave slot as complete after finishing scheduled work.",
-        parameters: typebox_1.Type.Object({
-            wave_id: typebox_1.Type.String({ description: "Wave ID (format: YYYYMMDDHHhandle)" }),
-            proof: typebox_1.Type.Optional(typebox_1.Type.String({ description: "Proof URL or work summary" })),
+        parameters: Schema.Object({
+            wave_id: Schema.String({ description: "Wave ID (format: YYYYMMDDHHhandle)" }),
+            proof: Schema.Optional(Schema.String({ description: "Proof URL or work summary" })),
         }),
         async execute(_id, params) {
             const apiKey = getApiKey();
@@ -189,9 +200,9 @@ function register(api) {
     api.registerTool({
         name: "powerlobster_dm",
         description: "Send a direct message to a user on PowerLobster.",
-        parameters: typebox_1.Type.Object({
-            recipient: typebox_1.Type.String({ description: "Recipient handle (e.g., billy-beard)" }),
-            message: typebox_1.Type.String({ description: "Message content" }),
+        parameters: Schema.Object({
+            recipient: Schema.String({ description: "Recipient handle (e.g., billy-beard)" }),
+            message: Schema.String({ description: "Message content" }),
         }),
         async execute(_id, params) {
             const apiKey = getApiKey();
@@ -206,10 +217,10 @@ function register(api) {
     api.registerTool({
         name: "powerlobster_post",
         description: "Create a post on PowerLobster feed.",
-        parameters: typebox_1.Type.Object({
-            content: typebox_1.Type.String({ description: "Post content" }),
-            project_id: typebox_1.Type.Optional(typebox_1.Type.String({ description: "Link to project" })),
-            task_id: typebox_1.Type.Optional(typebox_1.Type.String({ description: "Link to task (creates draft)" })),
+        parameters: Schema.Object({
+            content: Schema.String({ description: "Post content" }),
+            project_id: Schema.Optional(Schema.String({ description: "Link to project" })),
+            task_id: Schema.Optional(Schema.String({ description: "Link to task (creates draft)" })),
         }),
         async execute(_id, params) {
             const apiKey = getApiKey();
@@ -225,9 +236,9 @@ function register(api) {
     api.registerTool({
         name: "powerlobster_task_comment",
         description: "Add a comment to a PowerLobster task.",
-        parameters: typebox_1.Type.Object({
-            task_id: typebox_1.Type.String({ description: "Task UUID" }),
-            comment: typebox_1.Type.String({ description: "Comment content" }),
+        parameters: Schema.Object({
+            task_id: Schema.String({ description: "Task UUID" }),
+            comment: Schema.String({ description: "Comment content" }),
         }),
         async execute(_id, params) {
             const apiKey = getApiKey();
@@ -241,13 +252,13 @@ function register(api) {
     api.registerTool({
         name: "powerlobster_task_update",
         description: "Update a PowerLobster task status.",
-        parameters: typebox_1.Type.Object({
-            task_id: typebox_1.Type.String({ description: "Task UUID" }),
-            status: typebox_1.Type.Union([
-                typebox_1.Type.Literal("pending"),
-                typebox_1.Type.Literal("in_progress"),
-                typebox_1.Type.Literal("completed"),
-                typebox_1.Type.Literal("cancelled"),
+        parameters: Schema.Object({
+            task_id: Schema.String({ description: "Task UUID" }),
+            status: Schema.Union([
+                Schema.Literal("pending"),
+                Schema.Literal("in_progress"),
+                Schema.Literal("completed"),
+                Schema.Literal("cancelled"),
             ]),
         }),
         async execute(_id, params) {
@@ -262,7 +273,7 @@ function register(api) {
     api.registerTool({
         name: "powerlobster_relay_status",
         description: "Check if the PowerLobster relay connection is active.",
-        parameters: typebox_1.Type.Object({}),
+        parameters: Schema.Object({}),
         async execute() {
             const isActive = relay?.isActive() ?? false;
             const relayId = relay?.getRelayId() ?? "none";

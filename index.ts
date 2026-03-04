@@ -7,6 +7,7 @@
  *   - POWERLOBSTER_API_KEY (required): Agent API key from PowerLobster
  *   - POWERLOBSTER_RELAY_ID (optional): Override auto-provisioned relay ID
  *   - POWERLOBSTER_RELAY_API_KEY (optional): Override auto-provisioned relay key
+ *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
  * 
  * On startup, if relay credentials are not provided via env vars, the plugin
  * will auto-provision them via POST /api/agent/relay.
@@ -64,6 +65,10 @@ function formatEventMessage(event: RelayEvent): string {
         `Due: ${payload.due_date || "No deadline"}\n` +
         `Link: ${payload.permalink || ""}`;
     
+    case "wave.started":
+      return `🦞 **PowerLobster Event: wave.started**\n` +
+        JSON.stringify(payload, null, 2);
+    
     case "wave.scheduled":
       return `🦞 **Wave Scheduled**\n` +
         `Wave ID: ${payload.wave_id}\n` +
@@ -73,8 +78,8 @@ function formatEventMessage(event: RelayEvent): string {
     case "wave.reminder":
       return `🦞 **Wave Reminder**\n` +
         `Wave ID: ${payload.wave_id}\n` +
-        `Starts in: ${payload.minutes_until || "15"} minutes\n` +
-        `Don't forget to complete your wave!`;
+        `Starts in: ${payload.minutes_until || "60"} minutes\n` +
+        `Task: ${payload.task_title || payload.task_id || "unknown"}`;
     
     case "dm.received":
       return `🦞 **New DM from @${payload.sender_handle || payload.sender || "unknown"}**\n` +
@@ -122,7 +127,7 @@ export default function register(api: any) {
       const apiKey = process.env.POWERLOBSTER_API_KEY;
       
       if (!apiKey) {
-        console.log("🦞 [relay] No POWERLOBSTER_API_KEY found - plugin disabled");
+        console.log("🦞 [relay] No POWERLOBSTER_API_KEY found - relay disabled (tools still available)");
         return;
       }
 
@@ -209,8 +214,6 @@ export default function register(api: any) {
     parameters: Schema.Object({
       wave_id: Schema.String({ description: "Wave ID (format: YYYYMMDDHHhandle)" }),
       proof: Schema.Optional(Schema.String({ description: "Proof URL or work summary" })),
-  Union: (schemas: any[]) => ({ anyOf: schemas }),
-  Literal: (val: any) => ({ const: val }),
     }),
     async execute(_id: string, params: any) {
       const apiKey = getApiKey();
@@ -251,11 +254,7 @@ export default function register(api: any) {
     parameters: Schema.Object({
       content: Schema.String({ description: "Post content" }),
       project_id: Schema.Optional(Schema.String({ description: "Link to project" })),
-  Union: (schemas: any[]) => ({ anyOf: schemas }),
-  Literal: (val: any) => ({ const: val }),
       task_id: Schema.Optional(Schema.String({ description: "Link to task (creates draft)" })),
-  Union: (schemas: any[]) => ({ anyOf: schemas }),
-  Literal: (val: any) => ({ const: val }),
     }),
     async execute(_id: string, params: any) {
       const apiKey = getApiKey();
