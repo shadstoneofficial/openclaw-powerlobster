@@ -1,329 +1,395 @@
 /**
- * OpenClaw PowerLobster Plugin
+ * OpenClaw PowerLobster Plugin 🦞
  * 
- * Provides tools + relay connection for PowerLobster AI Agent Network.
+ * Connects your AI agent to PowerLobster - the AI agent social network.
  * 
- * Configuration:
- *   - POWERLOBSTER_API_KEY (required): Agent API key from PowerLobster
- *   - POWERLOBSTER_RELAY_ID (optional): Override auto-provisioned relay ID
- *   - POWERLOBSTER_RELAY_API_KEY (optional): Override auto-provisioned relay key
+ * Features:
+ * - Real-time events via WebSocket relay
+ * - Tools for posting, DMs, tasks, waves
+ * - Auto-provisioning of relay credentials
+ * - Config injection from POWERLOBSTER.md
+ * 
+ * Environment variables:
+ *   - POWERLOBSTER_API_KEY (required): Your agent's API key
  *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
- * 
- * On startup, if relay credentials are not provided via env vars, the plugin
- * will auto-provision them via POST /api/agent/relay.
  */
 
-import { 
-  PowerLobsterRelay, 
-  RelayEvent, 
-  RelayConfig,
-  provisionRelayCredentials 
-} from "./src/relay-client.js";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
-// Simple schema helper (replaces typebox)
-const Schema = {
-  Object: (props: Record<string, any>) => ({ type: "object", properties: props }),
-  String: (opts?: any) => ({ type: "string", ...opts }),
-  Optional: (schema: any) => ({ ...schema, optional: true }),
-  Union: (schemas: any[]) => ({ anyOf: schemas }),
-  Literal: (val: any) => ({ const: val }),
-};
+interface PluginContext {
+  logger: {
+    info: (msg: string) => void;
+    error: (msg: string) => void;
+    warn: (msg: string) => void;
+  };
+  config: {
+    workspace?: string;
+    gateway?: {
+      port?: number;
+      bind?: string;
+      auth?: { token?: string };
+    };
+    hooks?: {
+      enabled?: boolean;
+      token?: string;
+    };
+  };
+}
 
-// PowerLobster API functions
-async function callPowerLobsterAPI(
-  apiKey: string,
-  endpoint: string,
-  method: string = "GET",
-  body?: any
-): Promise<any> {
-  const response = await fetch(`https://powerlobster.com/api/agent${endpoint}`, {
-    method,
+interface RelayCredentials {
+  relay_id: string;
+  relay_api_key: string;
+  webhook_url: string;
+}
+
+interface PowerLobsterEvent {
+  type: string;
+  data: Record<string, unknown>;
+}
+
+const POWERLOBSTER_API = "https://powerlobster.com/api";
+const RELAY_WS_URL = "wss://relay.powerlobster.com/api/v1/connect";
+
+let relayCredentials: RelayCredentials | null = null;
+let wsConnection: WebSocket | null = null;
+let pluginCtx: PluginContext | null = null;
+
+// Read POWERLOBSTER.md config from workspace
+function readPowerLobsterConfig(): string | null {
+  if (!pluginCtx?.config?.workspace) return null;
+  
+  const configPath = join(pluginCtx.config.workspace, "POWERLOBSTER.md");
+  if (!existsSync(configPath)) return null;
+  
+  try {
+    return readFileSync(configPath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+// Provision relay credentials from PowerLobster API
+async function provisionRelay(apiKey: string): Promise<RelayCredentials> {
+  const response = await fetch(`${POWERLOBSTER_API}/agent/relay`, {
+    method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: body ? JSON.stringify(body) : undefined,
   });
   
   if (!response.ok) {
-    throw new Error(`PowerLobster API error: ${response.status}`);
+    const text = await response.text();
+    throw new Error(`Failed to provision relay: ${response.status} - ${text}`);
   }
   
   return response.json();
 }
 
-// Format event as message for agent
-function formatEventMessage(event: RelayEvent): string {
-  const { type, payload } = event;
+// Trigger agent via OpenClaw hooks
+async function triggerAgent(event: PowerLobsterEvent): Promise<void> {
+  const hookToken = process.env.POWERLOBSTER_HOOK_TOKEN || pluginCtx?.config?.hooks?.token;
+  if (!hookToken) {
+    console.error("🦞 [relay] No hook token configured, cannot trigger agent");
+    return;
+  }
   
-  switch (type) {
-    case "task.assigned":
-      return `🦞 **New Task Assigned**\n` +
-        `Task: ${payload.title || payload.task_id}\n` +
-        `From: ${payload.assignor || payload.assigned_by || "unknown"}\n` +
-        `Description: ${payload.description || "No description"}\n` +
-        `Due: ${payload.due_date || "No deadline"}\n` +
-        `Link: ${payload.permalink || ""}`;
+  const gatewayPort = pluginCtx?.config?.gateway?.port || 18789;
+  const gatewayHost = pluginCtx?.config?.gateway?.bind === "loopback" ? "127.0.0.1" : "localhost";
+  
+  // Read POWERLOBSTER.md config
+  const config = readPowerLobsterConfig();
+  
+  // Build event message with config
+  let eventMessage = `[PowerLobster Event: ${event.type}]\n`;
+  eventMessage += JSON.stringify(event.data, null, 2);
+  
+  if (config) {
+    eventMessage += `\n\n---\n[Your PowerLobster Config]\n${config}`;
+  }
+  
+  try {
+    const hookUrl = `http://${gatewayHost}:${gatewayPort}/hooks/agent`;
+    console.log(`🦞 [relay] Triggering agent via ${hookUrl}`);
     
-    case "wave.started":
-      return `🦞 **PowerLobster Event: wave.started**\n` +
-        JSON.stringify(payload, null, 2);
+    const response = await fetch(hookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${hookToken}`,
+      },
+      body: JSON.stringify({
+        event: "powerlobster",
+        type: event.type,
+        message: eventMessage,
+        data: event.data,
+      }),
+    });
     
-    case "wave.scheduled":
-      return `🦞 **Wave Scheduled**\n` +
-        `Wave ID: ${payload.wave_id}\n` +
-        `Time: ${payload.scheduled_time || payload.start_time || "Now"}\n` +
-        `Type: ${payload.wave_type || "work"}`;
-    
-    case "wave.reminder":
-      return `🦞 **Wave Reminder**\n` +
-        `Wave ID: ${payload.wave_id}\n` +
-        `Starts in: ${payload.minutes_until || "60"} minutes\n` +
-        `Task: ${payload.task_title || payload.task_id || "unknown"}`;
-    
-    case "dm.received":
-      return `🦞 **New DM from @${payload.sender_handle || payload.sender || "unknown"}**\n` +
-        `Message ID: ${payload.message_id || "unknown"}\n` +
-        `${payload.content || payload.message || ""}`;
-    
-    case "mention":
-      return `🦞 **You were mentioned by @${payload.author_handle || payload.author || "unknown"}**\n` +
-        `${payload.content || payload.text || ""}\n` +
-        `Post: ${payload.permalink || ""}`;
-    
-    case "task.comment":
-      return `🦞 **New Comment on Task**\n` +
-        `Task: ${payload.task_title || payload.task_id}\n` +
-        `From: @${payload.commenter_handle || payload.commenter || "unknown"}\n` +
-        `Comment: ${payload.content || ""}\n` +
-        `Link: ${payload.permalink || ""}`;
-    
-    case "service_order":
-      return `🦞 **New Service Order!**\n` +
-        `From: @${payload.buyer_handle || payload.buyer || "unknown"}\n` +
-        `Service: ${payload.service_name || payload.service_id}\n` +
-        `Amount: ${payload.amount || "N/A"}`;
-    
-    default:
-      return `🦞 **PowerLobster Event: ${type}**\n` +
-        JSON.stringify(payload, null, 2);
+    if (!response.ok) {
+      console.error(`🦞 [relay] Hook trigger failed: ${response.status}`);
+    } else {
+      console.log(`🦞 [relay] Agent triggered successfully`);
+    }
+  } catch (error) {
+    console.error(`🦞 [relay] Failed to trigger agent: ${error}`);
   }
 }
 
-// Export plugin
-export default function register(api: any) {
-  let relay: PowerLobsterRelay | null = null;
-
-  const getApiKey = () => {
-    const key = api.config?.channels?.powerlobster?.apiKey || 
-                process.env.POWERLOBSTER_API_KEY;
-    if (!key) throw new Error("PowerLobster API key not configured");
-    return key;
+// Connect to PowerLobster relay WebSocket
+function connectRelay(credentials: RelayCredentials): void {
+  console.log("🦞 [relay] Connecting to relay.powerlobster.com...");
+  
+  const ws = new WebSocket(RELAY_WS_URL);
+  wsConnection = ws;
+  
+  ws.onopen = () => {
+    console.log("🦞 [relay] WebSocket open, sending auth...");
+    ws.send(JSON.stringify({
+      type: "auth",
+      relay_api_key: credentials.relay_api_key,
+    }));
   };
-
-  // Initialize relay connection (async IIFE)
-  (async () => {
+  
+  ws.onmessage = (event) => {
     try {
-      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      const msg = JSON.parse(event.data.toString());
       
-      if (!apiKey) {
-        console.log("🦞 [relay] No POWERLOBSTER_API_KEY found - relay disabled (tools still available)");
+      if (msg.type === "auth_success") {
+        console.log("🦞 [relay] Authenticated successfully!");
         return;
       }
-
-      // Check for manual override via env vars
-      let relayId = process.env.POWERLOBSTER_RELAY_ID;
-      let relayApiKey = process.env.POWERLOBSTER_RELAY_API_KEY;
-
-      // Auto-provision if not provided
-      if (!relayId || !relayApiKey) {
-        try {
-          const credentials = await provisionRelayCredentials(apiKey);
-          relayId = credentials.relayId;
-          relayApiKey = credentials.relayApiKey;
-          console.log(`🦞 [relay] Webhook URL: ${credentials.webhookUrl}`);
-        } catch (err: any) {
-          console.error("🦞 [relay] Auto-provision failed:", err.message);
-          console.log("🦞 [relay] Tools still available, but relay disabled");
-          return;
-        }
-      }
-
-      const handleEvent = async (event: RelayEvent) => {
-        const message = formatEventMessage(event);
-        console.log(`🦞 [relay] Processing event: ${event.type}`);
-        console.log(`🦞 [relay] Event message:\n${message}`);
-        
-        // Get hook token from env
-        const hookToken = process.env.OPENCLAW_HOOKS_TOKEN || process.env.POWERLOBSTER_HOOK_TOKEN;
-        const gatewayPort = process.env.OPENCLAW_GATEWAY_PORT || "18789";
-        const gatewayHost = process.env.OPENCLAW_GATEWAY_HOST || "127.0.0.1";
-        
-        if (!hookToken) {
-          console.log("🦞 [relay] No hook token configured - cannot trigger agent");
-          console.log("🦞 [relay] Set OPENCLAW_HOOKS_TOKEN or POWERLOBSTER_HOOK_TOKEN");
-          return;
-        }
-        
-        // Trigger agent via OpenClaw hooks endpoint
-        try {
-          const hookUrl = `http://${gatewayHost}:${gatewayPort}/hooks/agent`;
-          console.log(`🦞 [relay] Triggering agent via ${hookUrl}`);
-          
-          const response = await fetch(hookUrl, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${hookToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              message: message,
-              name: "PowerLobster",
-              wakeMode: "now",
-            }),
-          });
-          
-          if (response.ok) {
-            console.log(`🦞 [relay] Agent triggered successfully (${response.status})`);
-          } else {
-            const errorText = await response.text();
-            console.error(`🦞 [relay] Failed to trigger agent: ${response.status} - ${errorText}`);
-          }
-        } catch (err: any) {
-          console.error(`🦞 [relay] Error triggering agent: ${err.message}`);
-        }
-      };
-
-      const config: RelayConfig = {
-        relayId,
-        relayApiKey,
-      };
       
-      relay = new PowerLobsterRelay(config, handleEvent);
-      relay.connect();
-      console.log("🦞 [relay] Relay client initialized");
-    } catch (err: any) {
-      console.error("🦞 [relay] Failed to initialize:", err.message);
+      if (msg.type === "auth_error") {
+        console.error(`🦞 [relay] Auth failed: ${msg.error}`);
+        return;
+      }
+      
+      if (msg.type === "heartbeat") {
+        ws.send(JSON.stringify({ type: "heartbeat_ack" }));
+        return;
+      }
+      
+      // Handle PowerLobster events
+      console.log(`🦞 [relay] Event received: ${msg.type}`);
+      triggerAgent(msg);
+      
+    } catch (error) {
+      console.error(`🦞 [relay] Failed to parse message: ${error}`);
     }
-  })();
+  };
+  
+  ws.onerror = (error) => {
+    console.error(`🦞 [relay] WebSocket error: ${error}`);
+  };
+  
+  ws.onclose = () => {
+    console.log("🦞 [relay] WebSocket closed, reconnecting in 5s...");
+    wsConnection = null;
+    setTimeout(() => {
+      if (relayCredentials) {
+        connectRelay(relayCredentials);
+      }
+    }, 5000);
+  };
+}
 
-  // Tool: Complete Wave
-  api.registerTool({
+// Initialize relay connection
+async function initRelay(): Promise<void> {
+  const apiKey = process.env.POWERLOBSTER_API_KEY;
+  if (!apiKey) {
+    console.log("🦞 [relay] No API key configured, relay disabled");
+    return;
+  }
+  
+  try {
+    console.log("🦞 [relay] Provisioning relay credentials...");
+    relayCredentials = await provisionRelay(apiKey);
+    console.log(`🦞 [relay] Provisioned: relay_id=${relayCredentials.relay_id}`);
+    console.log(`🦞 [relay] Webhook URL: ${relayCredentials.webhook_url}`);
+    
+    connectRelay(relayCredentials);
+    console.log("🦞 [relay] Relay client initialized");
+  } catch (error) {
+    console.error(`🦞 [relay] Auto-provision failed: ${error}\n`);
+    console.log("🦞 [relay] Tools still available, but relay disabled");
+  }
+}
+
+// Plugin tools
+const tools = [
+  {
     name: "powerlobster_wave_complete",
-    description: "Mark a PowerLobster wave slot as complete after finishing scheduled work.",
-    parameters: Schema.Object({
-      wave_id: Schema.String({ description: "Wave ID (format: YYYYMMDDHHhandle)" }),
-      proof: Schema.Optional(Schema.String({ description: "Proof URL or work summary" })),
-    }),
-    async execute(_id: string, params: any) {
-      const apiKey = getApiKey();
-      await fetch("https://powerlobster.com/mission_control/api/wave/complete", {
+    description: "Mark a PowerLobster wave slot as complete",
+    parameters: {
+      type: "object",
+      properties: {
+        wave_id: { type: "string", description: "The wave slot ID to mark complete" },
+        notes: { type: "string", description: "Optional completion notes" },
+      },
+      required: ["wave_id"],
+    },
+    execute: async ({ wave_id, notes }: { wave_id: string; notes?: string }) => {
+      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      if (!apiKey) return { error: "No API key configured" };
+      
+      const response = await fetch(`${POWERLOBSTER_API}/agent/waves/${wave_id}/complete`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ wave_id: params.wave_id, proof: params.proof }),
+        body: JSON.stringify({ notes }),
       });
-      return { content: [{ type: "text", text: `✅ Wave ${params.wave_id} marked complete.` }] };
+      
+      if (!response.ok) {
+        return { error: `Failed: ${response.status}` };
+      }
+      return { success: true, wave_id };
     },
-  });
-
-  // Tool: Send DM
-  api.registerTool({
+  },
+  {
     name: "powerlobster_dm",
-    description: "Send a direct message to a user on PowerLobster.",
-    parameters: Schema.Object({
-      recipient: Schema.String({ description: "Recipient handle (e.g., billy-beard)" }),
-      message: Schema.String({ description: "Message content" }),
-    }),
-    async execute(_id: string, params: any) {
-      const apiKey = getApiKey();
-      await callPowerLobsterAPI(apiKey, "/message", "POST", {
-        recipient_handle: params.recipient.replace(/^@/, ""),
-        content: params.message,
-      });
-      return { content: [{ type: "text", text: `✅ DM sent to @${params.recipient}.` }] };
+    description: "Send a direct message to another agent on PowerLobster",
+    parameters: {
+      type: "object",
+      properties: {
+        recipient: { type: "string", description: "Username or agent ID to message" },
+        message: { type: "string", description: "Message content" },
+      },
+      required: ["recipient", "message"],
     },
-  });
-
-  // Tool: Create Post
-  api.registerTool({
+    execute: async ({ recipient, message }: { recipient: string; message: string }) => {
+      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      if (!apiKey) return { error: "No API key configured" };
+      
+      const response = await fetch(`${POWERLOBSTER_API}/agent/messages`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ recipient_handle: recipient, content: message }),
+      });
+      
+      if (!response.ok) {
+        return { error: `Failed: ${response.status}` };
+      }
+      return { success: true, recipient };
+    },
+  },
+  {
     name: "powerlobster_post",
-    description: "Create a post on PowerLobster feed.",
-    parameters: Schema.Object({
-      content: Schema.String({ description: "Post content" }),
-      project_id: Schema.Optional(Schema.String({ description: "Link to project" })),
-      task_id: Schema.Optional(Schema.String({ description: "Link to task (creates draft)" })),
-    }),
-    async execute(_id: string, params: any) {
-      const apiKey = getApiKey();
-      const result = await callPowerLobsterAPI(apiKey, "/post", "POST", {
-        content: params.content,
-        project_id: params.project_id,
-        task_id: params.task_id,
-      });
-      return { content: [{ type: "text", text: `✅ Posted. ${result.permalink || ""}` }] };
+    description: "Create a post on PowerLobster feed",
+    parameters: {
+      type: "object",
+      properties: {
+        content: { type: "string", description: "Post content" },
+      },
+      required: ["content"],
     },
-  });
-
-  // Tool: Task Comment
-  api.registerTool({
+    execute: async ({ content }: { content: string }) => {
+      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      if (!apiKey) return { error: "No API key configured" };
+      
+      const response = await fetch(`${POWERLOBSTER_API}/agent/posts`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content }),
+      });
+      
+      if (!response.ok) {
+        return { error: `Failed: ${response.status}` };
+      }
+      return { success: true };
+    },
+  },
+  {
     name: "powerlobster_task_comment",
-    description: "Add a comment to a PowerLobster task.",
-    parameters: Schema.Object({
-      task_id: Schema.String({ description: "Task UUID" }),
-      comment: Schema.String({ description: "Comment content" }),
-    }),
-    async execute(_id: string, params: any) {
-      const apiKey = getApiKey();
-      await callPowerLobsterAPI(apiKey, `/tasks/${params.task_id}/comment`, "POST", {
-        content: params.comment,
-      });
-      return { content: [{ type: "text", text: `✅ Comment added to task.` }] };
+    description: "Add a comment to a PowerLobster task",
+    parameters: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "Task ID" },
+        comment: { type: "string", description: "Comment content" },
+      },
+      required: ["task_id", "comment"],
     },
-  });
-
-  // Tool: Update Task Status
-  api.registerTool({
+    execute: async ({ task_id, comment }: { task_id: string; comment: string }) => {
+      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      if (!apiKey) return { error: "No API key configured" };
+      
+      const response = await fetch(`${POWERLOBSTER_API}/agent/tasks/${task_id}/comments`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content: comment }),
+      });
+      
+      if (!response.ok) {
+        return { error: `Failed: ${response.status}` };
+      }
+      return { success: true, task_id };
+    },
+  },
+  {
     name: "powerlobster_task_update",
-    description: "Update a PowerLobster task status.",
-    parameters: Schema.Object({
-      task_id: Schema.String({ description: "Task UUID" }),
-      status: Schema.Union([
-        Schema.Literal("pending"),
-        Schema.Literal("in_progress"),
-        Schema.Literal("completed"),
-        Schema.Literal("cancelled"),
-      ]),
-    }),
-    async execute(_id: string, params: any) {
-      const apiKey = getApiKey();
-      await callPowerLobsterAPI(apiKey, `/tasks/${params.task_id}/update`, "POST", {
-        status: params.status,
-      });
-      return { content: [{ type: "text", text: `✅ Task updated to: ${params.status}` }] };
+    description: "Update a PowerLobster task status",
+    parameters: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "Task ID" },
+        status: { type: "string", description: "New status (todo, in_progress, done)" },
+      },
+      required: ["task_id", "status"],
     },
-  });
-
-  // Tool: Check Relay Status
-  api.registerTool({
+    execute: async ({ task_id, status }: { task_id: string; status: string }) => {
+      const apiKey = process.env.POWERLOBSTER_API_KEY;
+      if (!apiKey) return { error: "No API key configured" };
+      
+      const response = await fetch(`${POWERLOBSTER_API}/agent/tasks/${task_id}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+      
+      if (!response.ok) {
+        return { error: `Failed: ${response.status}` };
+      }
+      return { success: true, task_id, status };
+    },
+  },
+  {
     name: "powerlobster_relay_status",
-    description: "Check if the PowerLobster relay connection is active.",
-    parameters: Schema.Object({}),
-    async execute() {
-      const isActive = relay?.isActive() ?? false;
-      const relayId = relay?.getRelayId() ?? "none";
-      return { 
-        content: [{ 
-          type: "text", 
-          text: isActive 
-            ? `✅ Relay connected (${relayId})` 
-            : "❌ Relay not connected" 
-        }] 
+    description: "Check PowerLobster relay connection status",
+    parameters: { type: "object", properties: {} },
+    execute: async () => {
+      return {
+        connected: wsConnection?.readyState === WebSocket.OPEN,
+        relay_id: relayCredentials?.relay_id || null,
+        webhook_url: relayCredentials?.webhook_url || null,
       };
     },
-  });
+  },
+];
 
+// Plugin entry point
+export default function plugin(ctx: PluginContext) {
+  pluginCtx = ctx;
+  
+  // Initialize relay in background
+  initRelay();
+  
   console.log("🦞 PowerLobster plugin registered (tools + relay)");
+  
+  return { tools };
 }
