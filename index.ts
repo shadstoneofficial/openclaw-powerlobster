@@ -14,8 +14,10 @@
  *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
  */
 
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
+
+const CREDENTIALS_CACHE = join(process.env.HOME || "/root", ".openclaw", "powerlobster-relay.json");
 
 interface PluginContext {
   logger: {
@@ -196,6 +198,30 @@ function connectRelay(credentials: RelayCredentials): void {
   };
 }
 
+// Load cached credentials
+function loadCachedCredentials(): RelayCredentials | null {
+  try {
+    if (existsSync(CREDENTIALS_CACHE)) {
+      const data = readFileSync(CREDENTIALS_CACHE, "utf-8");
+      console.log("🦞 [relay] Loaded cached credentials");
+      return JSON.parse(data) as RelayCredentials;
+    }
+  } catch {
+    // Ignore, will provision fresh
+  }
+  return null;
+}
+
+// Save credentials to cache
+function saveCachedCredentials(creds: RelayCredentials): void {
+  try {
+    writeFileSync(CREDENTIALS_CACHE, JSON.stringify(creds, null, 2));
+    console.log("🦞 [relay] Saved credentials to cache");
+  } catch (error) {
+    console.error("🦞 [relay] Failed to cache credentials:", error);
+  }
+}
+
 // Initialize relay connection
 async function initRelay(): Promise<void> {
   const apiKey = process.env.POWERLOBSTER_API_KEY;
@@ -209,19 +235,28 @@ async function initRelay(): Promise<void> {
     const envRelayApiKey = process.env.POWERLOBSTER_RELAY_API_KEY;
     
     if (envRelayId && envRelayApiKey) {
-      console.log("🦞 [relay] Using configured relay credentials");
+      // Priority 1: Env vars
+      console.log("🦞 [relay] Using env var credentials");
       relayCredentials = {
         relay_id: envRelayId,
         relay_api_key: envRelayApiKey,
         webhook_url: `https://relay.powerlobster.com/api/v1/webhook/${envRelayId}`,
       };
-      console.log(`🦞 [relay] Relay ID: ${relayCredentials.relay_id}`);
     } else {
-      console.log("🦞 [relay] Provisioning relay credentials...");
-      relayCredentials = await provisionRelay(apiKey);
-      console.log(`🦞 [relay] Provisioned: relay_id=${relayCredentials.relay_id}`);
-      console.log(`🦞 [relay] Webhook URL: ${relayCredentials.webhook_url}`);
+      // Priority 2: Cached credentials
+      const cached = loadCachedCredentials();
+      if (cached) {
+        relayCredentials = cached;
+      } else {
+        // Priority 3: Auto-provision and cache
+        console.log("🦞 [relay] Provisioning new credentials...");
+        relayCredentials = await provisionRelay(apiKey);
+        console.log(`🦞 [relay] Provisioned: relay_id=${relayCredentials.relay_id}`);
+        saveCachedCredentials(relayCredentials);
+      }
     }
+    
+    console.log(`🦞 [relay] Relay ID: ${relayCredentials.relay_id}`);
     
     connectRelay(relayCredentials);
     console.log("🦞 [relay] Relay client initialized");
