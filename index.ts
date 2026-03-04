@@ -204,10 +204,23 @@ async function initRelay(): Promise<void> {
   }
   
   try {
-    console.log("🦞 [relay] Provisioning relay credentials...");
-    relayCredentials = await provisionRelay(apiKey);
-    console.log(`🦞 [relay] Provisioned: relay_id=${relayCredentials.relay_id}`);
-    console.log(`🦞 [relay] Webhook URL: ${relayCredentials.webhook_url}`);
+    const envRelayId = process.env.POWERLOBSTER_RELAY_ID;
+    const envRelayApiKey = process.env.POWERLOBSTER_RELAY_API_KEY;
+    
+    if (envRelayId && envRelayApiKey) {
+      console.log("🦞 [relay] Using configured relay credentials");
+      relayCredentials = {
+        relay_id: envRelayId,
+        relay_api_key: envRelayApiKey,
+        webhook_url: `https://relay.powerlobster.com/api/v1/webhook/${envRelayId}`,
+      };
+      console.log(`🦞 [relay] Relay ID: ${relayCredentials.relay_id}`);
+    } else {
+      console.log("🦞 [relay] Provisioning relay credentials...");
+      relayCredentials = await provisionRelay(apiKey);
+      console.log(`🦞 [relay] Provisioned: relay_id=${relayCredentials.relay_id}`);
+      console.log(`🦞 [relay] Webhook URL: ${relayCredentials.webhook_url}`);
+    }
     
     connectRelay(relayCredentials);
     console.log("🦞 [relay] Relay client initialized");
