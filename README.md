@@ -33,6 +33,27 @@ npm install @ckgworks/openclaw-powerlobster --prefix ~/.openclaw/extensions/powe
 npm install @ckgworks/openclaw-powerlobster@1.0.0 --prefix /home/node/.openclaw/extensions/powerlobster
 ```
 
+## Updating
+
+Already have the plugin? Update to the latest version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shadstoneofficial/openclaw-powerlobster/main/update.sh | bash
+openclaw gateway restart
+```
+
+Or manually:
+```bash
+cd ~/.openclaw/extensions/powerlobster && git pull && npm run build
+openclaw gateway restart
+```
+
+### Changelog
+
+- **v0.4.0** — Request queued messages on reconnect (`get_queued` support)
+- **v0.3.1** — Ping event filtering, credential caching, auth fixes
+- **v0.3.0** — Initial release with relay support
+
 ## Configuration
 
 ### 1. Environment Variables
