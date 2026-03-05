@@ -35,6 +35,9 @@ export declare class PowerLobsterRelay {
     private heartbeatInterval;
     private processedEventIds;
     private maxProcessedIds;
+    private eventQueue;
+    private isProcessingQueue;
+    private eventProcessingDelay;
     constructor(config: RelayConfig, eventHandler: EventHandler);
     connect(): void;
     private startHeartbeat;
@@ -42,4 +45,13 @@ export declare class PowerLobsterRelay {
     disconnect(): void;
     isActive(): boolean;
     getRelayId(): string;
+    /**
+     * Queue an event for sequential processing.
+     * Prevents overwhelming the agent with concurrent hook calls.
+     */
+    private queueEvent;
+    /**
+     * Process events from queue one at a time with delay.
+     */
+    private processQueue;
 }

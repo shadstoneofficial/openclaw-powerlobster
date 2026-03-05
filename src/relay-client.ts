@@ -80,6 +80,11 @@ export class PowerLobsterRelay {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private processedEventIds: Set<string> = new Set();
   private maxProcessedIds: number = 1000; // Prevent memory bloat
+  
+  // Event queue for sequential processing
+  private eventQueue: RelayEvent[] = [];
+  private isProcessingQueue: boolean = false;
+  private eventProcessingDelay: number = 500; // 500ms between events
 
   constructor(config: RelayConfig, eventHandler: EventHandler) {
     this.config = {
@@ -202,7 +207,8 @@ export class PowerLobsterRelay {
             this.ws?.send(JSON.stringify({ type: "ack", id: message.id }));
           }
 
-          this.eventHandler(event);
+          // Queue event for sequential processing
+          this.queueEvent(event);
           return;
         }
 
@@ -267,5 +273,49 @@ export class PowerLobsterRelay {
 
   getRelayId(): string {
     return this.config.relayId;
+  }
+
+  /**
+   * Queue an event for sequential processing.
+   * Prevents overwhelming the agent with concurrent hook calls.
+   */
+  private queueEvent(event: RelayEvent): void {
+    this.eventQueue.push(event);
+    console.log(`🦞 [relay] Event queued: ${event.type} (queue size: ${this.eventQueue.length})`);
+    
+    // Start processing if not already running
+    if (!this.isProcessingQueue) {
+      this.processQueue();
+    }
+  }
+
+  /**
+   * Process events from queue one at a time with delay.
+   */
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.eventQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    while (this.eventQueue.length > 0) {
+      const event = this.eventQueue.shift()!;
+      
+      try {
+        console.log(`🦞 [relay] Processing event: ${event.type} (${this.eventQueue.length} remaining)`);
+        this.eventHandler(event);
+      } catch (err: any) {
+        console.error(`🦞 [relay] Error processing event: ${err.message}`);
+      }
+
+      // Wait before processing next event
+      if (this.eventQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, this.eventProcessingDelay));
+      }
+    }
+
+    this.isProcessingQueue = false;
+    console.log("🦞 [relay] Queue empty, processing complete");
   }
 }
