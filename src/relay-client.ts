@@ -78,6 +78,8 @@ export class PowerLobsterRelay {
   private isConnected: boolean = false;
   private shouldReconnect: boolean = true;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private processedEventIds: Set<string> = new Set();
+  private maxProcessedIds: number = 1000; // Prevent memory bloat
 
   constructor(config: RelayConfig, eventHandler: EventHandler) {
     this.config = {
@@ -149,14 +151,49 @@ export class PowerLobsterRelay {
         // Handle webhook events from relay
         // Format: { type: "webhook", id: "...", payload: { event: "dm.received", data: {...} } }
         if (message.type === "webhook" && message.payload) {
+          const eventId = message.id || message.payload.id;
           const eventType = message.payload.event || "unknown";
           const eventData = message.payload.data || message.payload;
           
-          console.log(`🦞 [relay] Event received: ${eventType}`);
+          // Deduplicate: Skip if we've already processed this event
+          if (eventId && this.processedEventIds.has(eventId)) {
+            console.log(`🦞 [relay] Skipping duplicate event: ${eventId}`);
+            // Still ack to prevent re-delivery
+            if (message.id) {
+              this.ws?.send(JSON.stringify({ type: "ack", id: message.id }));
+            }
+            return;
+          }
+          
+          // Track processed event
+          if (eventId) {
+            this.processedEventIds.add(eventId);
+            // Prevent memory bloat - remove oldest if too many
+            if (this.processedEventIds.size > this.maxProcessedIds) {
+              const oldest = this.processedEventIds.values().next().value;
+              this.processedEventIds.delete(oldest);
+            }
+          }
+          
+          // Calculate event age for logging
+          const eventTime = message.payload.timestamp ? new Date(message.payload.timestamp).getTime() : Date.now();
+          const ageMs = Date.now() - eventTime;
+          const ageMin = Math.round(ageMs / 60000);
+          
+          if (ageMin > 5) {
+            console.log(`🦞 [relay] Event received: ${eventType} (${ageMin} min old, from queue)`);
+          } else {
+            console.log(`🦞 [relay] Event received: ${eventType}`);
+          }
           
           const event: RelayEvent = {
             type: eventType,
-            payload: eventData,
+            payload: {
+              ...eventData,
+              _eventId: eventId,
+              _ageMinutes: ageMin,
+              _isQueued: ageMin > 5,
+            },
             timestamp: message.payload.timestamp || message.timestamp || new Date().toISOString(),
           };
 

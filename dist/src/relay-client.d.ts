@@ -33,6 +33,8 @@ export declare class PowerLobsterRelay {
     private isConnected;
     private shouldReconnect;
     private heartbeatInterval;
+    private processedEventIds;
+    private maxProcessedIds;
     constructor(config: RelayConfig, eventHandler: EventHandler);
     connect(): void;
     private startHeartbeat;
