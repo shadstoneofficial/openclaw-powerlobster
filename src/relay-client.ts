@@ -123,6 +123,10 @@ export class PowerLobsterRelay {
           console.log("🦞 [relay] Authenticated successfully!");
           this.isConnected = true;
           this.startHeartbeat();
+          
+          // Request any queued messages we missed while offline
+          console.log("🦞 [relay] Requesting queued messages...");
+          this.ws?.send(JSON.stringify({ type: "get_queued" }));
           return;
         }
 
