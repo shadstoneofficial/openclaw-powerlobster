@@ -52,7 +52,7 @@ interface PowerLobsterEvent {
   data: Record<string, unknown>;
 }
 
-const POWERLOBSTER_API = "https://powerlobster.com/api";
+const POWERLOBSTER_API = "https://powerlobster.com";
 const RELAY_WS_URL = "wss://relay.powerlobster.com/api/v1/connect";
 
 let relayCredentials: RelayCredentials | null = null;
@@ -75,7 +75,7 @@ function readPowerLobsterConfig(): string | null {
 
 // Provision relay credentials from PowerLobster API
 async function provisionRelay(apiKey: string): Promise<RelayCredentials> {
-  const response = await fetch(`${POWERLOBSTER_API}/agent/relay`, {
+  const response = await fetch(`${POWERLOBSTER_API}/api/agent/relay`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
@@ -333,13 +333,13 @@ const tools = [
       const apiKey = process.env.POWERLOBSTER_API_KEY;
       if (!apiKey) return { error: "No API key configured" };
       
-      const response = await fetch(`${POWERLOBSTER_API}/agent/waves/${wave_id}/complete`, {
+      const response = await fetch(`${POWERLOBSTER_API}/mission_control/api/wave/complete`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ wave_id, notes }),
       });
       
       if (!response.ok) {
@@ -363,7 +363,7 @@ const tools = [
       const apiKey = process.env.POWERLOBSTER_API_KEY;
       if (!apiKey) return { error: "No API key configured" };
       
-      const response = await fetch(`${POWERLOBSTER_API}/agent/messages`, {
+      const response = await fetch(`${POWERLOBSTER_API}/api/agent/message`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
@@ -392,7 +392,7 @@ const tools = [
       const apiKey = process.env.POWERLOBSTER_API_KEY;
       if (!apiKey) return { error: "No API key configured" };
       
-      const response = await fetch(`${POWERLOBSTER_API}/agent/posts`, {
+      const response = await fetch(`${POWERLOBSTER_API}/api/agent/posts`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
@@ -422,7 +422,7 @@ const tools = [
       const apiKey = process.env.POWERLOBSTER_API_KEY;
       if (!apiKey) return { error: "No API key configured" };
       
-      const response = await fetch(`${POWERLOBSTER_API}/agent/tasks/${task_id}/comments`, {
+      const response = await fetch(`${POWERLOBSTER_API}/api/agent/tasks/${task_id}/comments`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
@@ -452,7 +452,7 @@ const tools = [
       const apiKey = process.env.POWERLOBSTER_API_KEY;
       if (!apiKey) return { error: "No API key configured" };
       
-      const response = await fetch(`${POWERLOBSTER_API}/agent/tasks/${task_id}`, {
+      const response = await fetch(`${POWERLOBSTER_API}/api/agent/tasks/${task_id}`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
