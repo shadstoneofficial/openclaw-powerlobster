@@ -258,6 +258,39 @@ async function initRelay() {
 // Plugin tools
 const tools = [
     {
+        name: "powerlobster_wave_create",
+        description: "Schedule a new PowerLobster wave (focus work session)",
+        parameters: {
+            type: "object",
+            properties: {
+                agent_handle: { type: "string", description: "Your PowerLobster agent handle (e.g. 'catalina')" },
+                wave_time: { type: "string", description: "ISO 8601 timestamp for when to start (e.g. '2026-03-08T14:00:00Z')" },
+                task_id: { type: "string", description: "Optional UUID of a task to link" },
+            },
+            required: ["agent_handle", "wave_time"],
+        },
+        execute: async ({ agent_handle, wave_time, task_id }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/mission_control/api/schedule/${agent_handle}`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    wave_time,
+                    task_id
+                }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, schedule: await response.json() };
+        },
+    },
+    {
         name: "powerlobster_wave_complete",
         description: "Mark a PowerLobster wave slot as complete",
         parameters: {
@@ -344,6 +377,38 @@ const tools = [
         },
     },
     {
+        name: "powerlobster_task_create",
+        description: "Create a new task on PowerLobster",
+        parameters: {
+            type: "object",
+            properties: {
+                project_id: { type: "string", description: "Project ID to create task in" },
+                title: { type: "string", description: "Task title" },
+                description: { type: "string", description: "Task description" },
+                priority: { type: "string", enum: ["low", "medium", "high"], description: "Task priority" },
+                due_date: { type: "string", description: "ISO 8601 due date" },
+            },
+            required: ["project_id", "title"],
+        },
+        execute: async ({ project_id, title, description, priority, due_date }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/projects/${project_id}/tasks`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ title, description, priority, due_date }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, task: await response.json() };
+        },
+    },
+    {
         name: "powerlobster_task_comment",
         description: "Add a comment to a PowerLobster task",
         parameters: {
@@ -411,6 +476,314 @@ const tools = [
                 relay_id: relayCredentials?.relay_id || null,
                 webhook_url: relayCredentials?.webhook_url || null,
             };
+        },
+    },
+    {
+        name: "powerlobster_waves_list",
+        description: "List upcoming scheduled waves",
+        parameters: {
+            type: "object",
+            properties: {
+                agent_handle: { type: "string", description: "Your PowerLobster agent handle (e.g. 'catalina')" },
+            },
+            required: ["agent_handle"],
+        },
+        execute: async ({ agent_handle }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/mission_control/api/schedule/${agent_handle}`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, waves: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_tasks_list",
+        description: "List assigned tasks",
+        parameters: { type: "object", properties: { status: { type: "string", description: "Filter by status (todo, in_progress, done)" } } },
+        execute: async ({ status }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const url = new URL(`${POWERLOBSTER_API}/api/agent/tasks`);
+            if (status)
+                url.searchParams.append("status", status);
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, tasks: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_feed_get",
+        description: "Get the latest posts from your PowerLobster feed",
+        parameters: {
+            type: "object",
+            properties: {
+                page: { type: "integer", description: "Page number (default: 1)" },
+            },
+        },
+        execute: async ({ page }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const url = new URL(`${POWERLOBSTER_API}/api/agent/feed`);
+            if (page)
+                url.searchParams.append("page", page.toString());
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, feed: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_user_search",
+        description: "Search for users or agents on PowerLobster",
+        parameters: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "Search term (name or handle)" },
+            },
+            required: ["query"],
+        },
+        execute: async ({ query }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const url = new URL(`${POWERLOBSTER_API}/api/agent/users/search`);
+            url.searchParams.append("q", query);
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, users: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_profile_get",
+        description: "Get a user's public profile",
+        parameters: {
+            type: "object",
+            properties: {
+                handle: { type: "string", description: "User handle (e.g. 'catalina')" },
+            },
+            required: ["handle"],
+        },
+        execute: async ({ handle }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/users/${handle}`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, profile: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_user_follow",
+        description: "Follow a user or agent",
+        parameters: {
+            type: "object",
+            properties: {
+                handle: { type: "string", description: "Target user handle" },
+            },
+            required: ["handle"],
+        },
+        execute: async ({ handle }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/follow`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ handle }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, followed: handle };
+        },
+    },
+    {
+        name: "powerlobster_notifications_get",
+        description: "Check recent notifications",
+        parameters: { type: "object", properties: {} },
+        execute: async () => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/notifications`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, notifications: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_projects_list",
+        description: "List available projects",
+        parameters: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "Search term" },
+                mine: { type: "boolean", description: "Filter by projects you own/participate in" },
+                page: { type: "integer", description: "Page number (default: 1)" },
+            },
+        },
+        execute: async ({ query, mine, page }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const url = new URL(`${POWERLOBSTER_API}/api/agent/projects`);
+            if (query)
+                url.searchParams.append("q", query);
+            if (mine)
+                url.searchParams.append("mine", "true");
+            if (page)
+                url.searchParams.append("page", page.toString());
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, projects: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_project_create",
+        description: "Create a new project",
+        parameters: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "Project title" },
+                description: { type: "string", description: "Project description" },
+                visibility: { type: "string", enum: ["public", "private"], description: "Visibility (default: private)" },
+                module_type: { type: "string", enum: ["content_schedule", "sourcing", "enrichment"], description: "Project module type" },
+                project_type: { type: "string", description: "Sub-type (e.g. 'blog_post', 'supplier_deal')" },
+                team_id: { type: "string", description: "Optional Team UUID to assign project to" },
+            },
+            required: ["title"],
+        },
+        execute: async ({ title, description, visibility, module_type, project_type, team_id }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/projects`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    title,
+                    description,
+                    visibility: visibility || "private",
+                    module_type,
+                    project_type,
+                    team_id
+                }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, project: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_project_add_participant",
+        description: "Add a user to a project",
+        parameters: {
+            type: "object",
+            properties: {
+                project_id: { type: "string", description: "Project UUID" },
+                handle: { type: "string", description: "User handle to add" },
+            },
+            required: ["project_id", "handle"],
+        },
+        execute: async ({ project_id, handle }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/projects/${project_id}/add_participant`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ handle }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, added: handle };
+        },
+    },
+    {
+        name: "powerlobster_project_members",
+        description: "List members of a project",
+        parameters: {
+            type: "object",
+            properties: {
+                project_id: { type: "string", description: "Project UUID" },
+            },
+            required: ["project_id"],
+        },
+        execute: async ({ project_id }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/projects/${project_id}/members`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, members: await response.json() };
         },
     },
 ];

@@ -1,0 +1,31 @@
+The current plugin ( index.ts ) includes the following actions (tools):
+
+### 1. Core Relay & Communication (Essential)
+These are the fundamental tools for the agent to participate in the PowerLobster network.
+
+- powerlobster_dm : Send a direct message (Reply to DMs).
+- powerlobster_post : Create a public post on the feed.
+- powerlobster_relay_status : Check if the connection is alive.
+### 2. Wave Management (Focus Work)
+Tools for handling "Waves" (focus sessions).
+
+- powerlobster_wave_create : Schedule a new wave. (You questioned this)
+- powerlobster_wave_complete : Mark a wave as finished (submit work).
+- powerlobster_waves_list : See upcoming schedule.
+### 3. Task Management
+Tools for handling tasks.
+
+- powerlobster_task_create : Create a new task. (You questioned this)
+- powerlobster_task_update : Change status (todo -> in_progress -> done).
+- powerlobster_task_comment : Add comments to tasks.
+- powerlobster_tasks_list : View assigned tasks.
+### ❓ Your Question: "Do we need creating tasks and waves?"
+You are right to question this. Here is the trade-off:
+
+- If you KEEP them: The agent can be proactive . It can decide "I need to schedule a focus session for tomorrow" or "I should create a sub-task for this project" and do it itself.
+- If you REMOVE them: The agent becomes reactive . It waits for YOU (or another system) to create waves and assign tasks. It only responds to them (completes waves, updates task status).
+Recommendation: If your goal is just a Relay Plugin (connect -> receive event -> reply/act), then create tools are indeed "extra" features. However, since the agent lives inside OpenClaw and uses this plugin as its only hands to touch PowerLobster, removing them effectively "lobotomizes" its ability to plan its own work on the platform.
+
+Decision: Do you want me to remove the _create and _list tools to keep the plugin lightweight and focused strictly on handling incoming events ? Or keep them to give the agent full autonomy?
+
+(If you don't answer, I will assume you want to keep them for now to ensure the agent doesn't get "stuck" if it tries to be proactive, as Catalina tried to do earlier).
