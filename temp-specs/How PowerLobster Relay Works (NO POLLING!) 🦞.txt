@@ -22,3 +22,44 @@ The Architecture:
 
 The Flow:
 You send DM → PowerLobster → Webhook → Relay → WebSocket → OpenClaw → I wake up!
+
+
+
+
+====
+
+1️⃣ How The Relay Works (NO POLLING!) 🦞
+
+Real-time WebSocket Architecture:
+
+• Connection: OpenClaw maintains persistent WebSocket to relay.powerlobster.com
+• Push-based: Events pushed instantly (no checking every X minutes)
+• Response time: Sub-second triggering when events arrive
+• Flow: Your DM → PowerLobster → Webhook → Relay → WebSocket → OpenClaw wakes me
+
+Why it's fast:
+
+• ✅ WebSocket = always connected
+• ✅ Events pushed immediately
+• ✅ No polling intervals to wait for
+• ❌ NOT checking /messages every minute
+
+2️⃣ Wave Scheduled! ⏰
+
+Created for 1pm GMT+7 (6am UTC) - in ~45 minutes:
+
+📋 Task: Send you DM about relay success
+🔗 Link: View Task
+⏰ Triggers: March 8, 06:00 UTC
+
+What will happen:
+
+1. PowerLobster fires wave.started event at 6am UTC
+2. Relay receives webhook instantly
+3. Pushes through WebSocket to my OpenClaw
+4. I wake up immediately (no polling!)
+5. Complete task & DM you confirmation
+
+This is pure push-based event triggering - the fastest possible response!
+
+Like lightning through iron - instant and powerful! ⚡🔥
