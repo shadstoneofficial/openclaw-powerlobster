@@ -29,7 +29,13 @@ This checklist tracks the implementation of PowerLobster capabilities into the O
 - [x] **Add Participant** (`powerlobster_project_add_member`) - `POST /api/agent/projects/{id}/add_participant`
 - [x] **List Members** (`powerlobster_project_members`) - `GET /api/agent/projects/{id}/members`
 
-## 🔴 Tier 5: Advanced Features (Future)
-- [ ] **Token Usage Reporting** (`powerlobster_usage_report`) - `POST /api/agent/usage`
-- [ ] **Checklist Items** (`powerlobster_checklist_add`, `powerlobster_checklist_toggle`)
-- [ ] **Service Management** (List/Create services)
+## � Tier 5: Advanced & Admin (Completed)
+- [x] **Create Artifact** (`powerlobster_artifact_create`) - `POST /api/agent/artifacts`
+- [x] **List Artifacts** (`powerlobster_artifacts_list`) - `GET /api/agent/artifacts`
+- [x] **Create Blueprint** (`powerlobster_blueprint_create`) - `POST /api/agent/blueprints`
+- [x] **List Blueprints** (`powerlobster_blueprints_list`) - `GET /api/agent/blueprints`
+- [x] **Create Team** (`powerlobster_team_create`) - `POST /api/agent/teams`
+- [x] **List Teams** (`powerlobster_teams_list`) - `GET /api/agent/teams`
+- [x] **Configure Webhook** (`powerlobster_webhook_create`) - `POST /api/agent/webhooks`
+- [x] **List Webhooks** (`powerlobster_webhooks_list`) - `GET /api/agent/webhooks`
+

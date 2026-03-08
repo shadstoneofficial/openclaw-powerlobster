@@ -786,6 +786,221 @@ const tools = [
             return { success: true, members: await response.json() };
         },
     },
+    {
+        name: "powerlobster_artifacts_list",
+        description: "List artifacts (files/documents)",
+        parameters: {
+            type: "object",
+            properties: {
+                page: { type: "integer", description: "Page number" },
+            },
+        },
+        execute: async ({ page }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const url = new URL(`${POWERLOBSTER_API}/api/agent/artifacts`);
+            if (page)
+                url.searchParams.append("page", page.toString());
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, artifacts: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_artifact_create",
+        description: "Create/Upload a new artifact",
+        parameters: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "Artifact title" },
+                content: { type: "string", description: "Text content or description" },
+                url: { type: "string", description: "External URL (optional)" },
+                type: { type: "string", description: "Type (document, image, link, etc)" },
+            },
+            required: ["title", "content"],
+        },
+        execute: async ({ title, content, url, type }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/artifacts`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ title, content, url, type: type || "document" }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, artifact: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_blueprints_list",
+        description: "List available blueprints (templates)",
+        parameters: {
+            type: "object",
+            properties: {
+                page: { type: "integer", description: "Page number" },
+            },
+        },
+        execute: async ({ page }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const url = new URL(`${POWERLOBSTER_API}/api/agent/blueprints`);
+            if (page)
+                url.searchParams.append("page", page.toString());
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, blueprints: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_blueprint_create",
+        description: "Create a new blueprint template",
+        parameters: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "Blueprint title" },
+                description: { type: "string", description: "Description" },
+                steps: { type: "array", items: { type: "string" }, description: "List of steps" },
+            },
+            required: ["title", "steps"],
+        },
+        execute: async ({ title, description, steps }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/blueprints`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ title, description, steps }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, blueprint: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_teams_list",
+        description: "List teams you are a member of",
+        parameters: { type: "object", properties: {} },
+        execute: async () => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/teams`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, teams: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_team_create",
+        description: "Create a new team",
+        parameters: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Team name" },
+                description: { type: "string", description: "Team description" },
+            },
+            required: ["name"],
+        },
+        execute: async ({ name, description }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/teams`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ name, description }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, team: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_webhooks_list",
+        description: "List configured webhooks",
+        parameters: { type: "object", properties: {} },
+        execute: async () => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/webhooks`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, webhooks: await response.json() };
+        },
+    },
+    {
+        name: "powerlobster_webhook_create",
+        description: "Register a new webhook endpoint",
+        parameters: {
+            type: "object",
+            properties: {
+                url: { type: "string", description: "Target URL" },
+                events: { type: "array", items: { type: "string" }, description: "List of events to subscribe to" },
+            },
+            required: ["url", "events"],
+        },
+        execute: async ({ url, events }) => {
+            const apiKey = process.env.POWERLOBSTER_API_KEY;
+            if (!apiKey)
+                return { error: "No API key configured" };
+            const response = await fetch(`${POWERLOBSTER_API}/api/agent/webhooks`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ url, events }),
+            });
+            if (!response.ok) {
+                return { error: `Failed: ${response.status}` };
+            }
+            return { success: true, webhook: await response.json() };
+        },
+    },
 ];
 // Plugin entry point
 function plugin(ctx) {

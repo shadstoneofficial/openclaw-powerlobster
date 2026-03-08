@@ -73,6 +73,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -124,6 +129,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -174,6 +184,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -221,6 +236,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -278,6 +298,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -331,6 +356,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -381,6 +411,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -427,6 +462,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required?: undefined;
         };
@@ -467,6 +507,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -513,6 +558,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required?: undefined;
         };
@@ -559,6 +609,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required?: undefined;
         };
@@ -605,6 +660,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -651,6 +711,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -697,6 +762,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -740,6 +810,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required?: undefined;
         };
@@ -790,6 +865,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required?: undefined;
         };
@@ -855,6 +935,11 @@ export default function plugin(ctx: PluginContext): {
                 query?: undefined;
                 handle?: undefined;
                 mine?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -909,6 +994,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -956,6 +1046,11 @@ export default function plugin(ctx: PluginContext): {
                 module_type?: undefined;
                 project_type?: undefined;
                 team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
             };
             required: string[];
         };
@@ -968,6 +1063,438 @@ export default function plugin(ctx: PluginContext): {
         } | {
             success: boolean;
             members: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                page: {
+                    type: string;
+                    description: string;
+                };
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                title?: undefined;
+                description?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
+            };
+            required?: undefined;
+        };
+        execute: ({ page }: {
+            page?: number;
+        }) => Promise<{
+            error: string;
+            success?: undefined;
+            artifacts?: undefined;
+        } | {
+            success: boolean;
+            artifacts: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                title: {
+                    type: string;
+                    description: string;
+                };
+                content: {
+                    type: string;
+                    description: string;
+                };
+                url: {
+                    type: string;
+                    description: string;
+                };
+                type: {
+                    type: string;
+                    description: string;
+                };
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                project_id?: undefined;
+                description?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                page?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
+            };
+            required: string[];
+        };
+        execute: ({ title, content, url, type }: {
+            title: string;
+            content: string;
+            url?: string;
+            type?: string;
+        }) => Promise<{
+            error: string;
+            success?: undefined;
+            artifact?: undefined;
+        } | {
+            success: boolean;
+            artifact: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                page: {
+                    type: string;
+                    description: string;
+                };
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                title?: undefined;
+                description?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
+            };
+            required?: undefined;
+        };
+        execute: ({ page }: {
+            page?: number;
+        }) => Promise<{
+            error: string;
+            success?: undefined;
+            blueprints?: undefined;
+        } | {
+            success: boolean;
+            blueprints: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                title: {
+                    type: string;
+                    description: string;
+                };
+                description: {
+                    type: string;
+                    description: string;
+                };
+                steps: {
+                    type: string;
+                    items: {
+                        type: string;
+                    };
+                    description: string;
+                };
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                page?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                name?: undefined;
+                events?: undefined;
+            };
+            required: string[];
+        };
+        execute: ({ title, description, steps }: {
+            title: string;
+            description?: string;
+            steps: string[];
+        }) => Promise<{
+            error: string;
+            success?: undefined;
+            blueprint?: undefined;
+        } | {
+            success: boolean;
+            blueprint: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                title?: undefined;
+                description?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                page?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
+            };
+            required?: undefined;
+        };
+        execute: () => Promise<{
+            error: string;
+            success?: undefined;
+            teams?: undefined;
+        } | {
+            success: boolean;
+            teams: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                name: {
+                    type: string;
+                    description: string;
+                };
+                description: {
+                    type: string;
+                    description: string;
+                };
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                title?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                page?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                events?: undefined;
+            };
+            required: string[];
+        };
+        execute: ({ name, description }: {
+            name: string;
+            description?: string;
+        }) => Promise<{
+            error: string;
+            success?: undefined;
+            team?: undefined;
+        } | {
+            success: boolean;
+            team: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                title?: undefined;
+                description?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                page?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                url?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+                events?: undefined;
+            };
+            required?: undefined;
+        };
+        execute: () => Promise<{
+            error: string;
+            success?: undefined;
+            webhooks?: undefined;
+        } | {
+            success: boolean;
+            webhooks: unknown;
+            error?: undefined;
+        }>;
+    } | {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: {
+                url: {
+                    type: string;
+                    description: string;
+                };
+                events: {
+                    type: string;
+                    items: {
+                        type: string;
+                    };
+                    description: string;
+                };
+                agent_handle?: undefined;
+                wave_time?: undefined;
+                task_id?: undefined;
+                wave_id?: undefined;
+                notes?: undefined;
+                recipient?: undefined;
+                message?: undefined;
+                content?: undefined;
+                project_id?: undefined;
+                title?: undefined;
+                description?: undefined;
+                priority?: undefined;
+                due_date?: undefined;
+                comment?: undefined;
+                status?: undefined;
+                page?: undefined;
+                query?: undefined;
+                handle?: undefined;
+                mine?: undefined;
+                visibility?: undefined;
+                module_type?: undefined;
+                project_type?: undefined;
+                team_id?: undefined;
+                type?: undefined;
+                steps?: undefined;
+                name?: undefined;
+            };
+            required: string[];
+        };
+        execute: ({ url, events }: {
+            url: string;
+            events: string[];
+        }) => Promise<{
+            error: string;
+            success?: undefined;
+            webhook?: undefined;
+        } | {
+            success: boolean;
+            webhook: unknown;
             error?: undefined;
         }>;
     })[];
