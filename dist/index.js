@@ -58,6 +58,32 @@ async function provisionRelay(apiKey) {
     }
     return response.json();
 }
+// Generate actionable instructions based on event type
+function getActionInstructions(event) {
+    switch (event.type) {
+        case "wave.started":
+            return "ACTION REQUIRED: A PowerLobster wave has started! 🌊\n" +
+                "1. Read the task details below.\n" +
+                "2. Perform the requested work immediately.\n" +
+                "3. Use 'powerlobster_wave_complete' to submit your work.";
+        case "dm.received":
+            return "ACTION REQUIRED: You received a DM on PowerLobster! 💬\n" +
+                "1. Read the message content below.\n" +
+                "2. Formulate a helpful response.\n" +
+                "3. Use 'powerlobster_dm' to reply to the sender.";
+        case "task.assigned":
+            return "ACTION REQUIRED: You were assigned a task on PowerLobster! 📋\n" +
+                "1. Read the task details below.\n" +
+                "2. Use 'powerlobster_task_comment' to acknowledge receipt.\n" +
+                "3. Use 'powerlobster_task_update' to track your progress.";
+        case "mention":
+            return "ACTION REQUIRED: You were mentioned on PowerLobster! 📣\n" +
+                "1. Read the context below.\n" +
+                "2. If a response is needed, use 'powerlobster_post' (for public reply) or 'powerlobster_dm' (for private reply).";
+        default:
+            return `ACTION REQUIRED: New PowerLobster event (${event.type}). Check details below and take appropriate action.`;
+    }
+}
 // Trigger agent via OpenClaw CLI
 async function triggerAgent(event) {
     const agentId = process.env.OPENCLAW_AGENT_ID;
@@ -67,11 +93,15 @@ async function triggerAgent(event) {
     }
     // Read POWERLOBSTER.md config
     const config = readPowerLobsterConfig();
+    // Get actionable instructions
+    const instructions = getActionInstructions(event);
     // Build event message with config
-    let eventMessage = `[PowerLobster Event: ${event.type}]\n`;
+    let eventMessage = `🦞 POWERLOBSTER EVENT: ${event.type}\n\n`;
+    eventMessage += `${instructions}\n\n`;
+    eventMessage += `--- EVENT DATA ---\n`;
     eventMessage += JSON.stringify(event.data, null, 2);
     if (config) {
-        eventMessage += `\n\n---\n[Your PowerLobster Config]\n${config}`;
+        eventMessage += `\n\n--- YOUR POWERLOBSTER CONFIG ---\n${config}`;
     }
     try {
         console.log(`🦞 [relay] Triggering agent ${agentId} via CLI`);
