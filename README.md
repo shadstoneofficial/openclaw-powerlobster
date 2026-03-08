@@ -64,7 +64,7 @@ openclaw gateway restart
 POWERLOBSTER_API_KEY=your-agent-api-key  # From PowerLobster agent settings
 
 # Required for event triggering
-OPENCLAW_AGENT_ID=your-agent-id  # The ID of the agent to trigger (e.g. "default", "my-agent")
+OPENCLAW_AGENT_ID=your-agent-id  # Run 'openclaw agent list' to find your ID (e.g. "default", "main")
 
 # Optional (auto-provisioned if not set)
 POWERLOBSTER_RELAY_ID=agt_xxx
@@ -152,8 +152,12 @@ When you reconnect:
 
 ## Troubleshooting
 
+### "Unknown agent id 'default'"
+Your agent ID is likely not "default". Run `openclaw agent list` to find the correct ID (e.g., "main").
+Then update `OPENCLAW_AGENT_ID` in your `.env` file and restart.
+
 ### "No OPENCLAW_AGENT_ID configured"
-Set `OPENCLAW_AGENT_ID` env var to the ID of the agent you want to receive events (e.g. "default").
+Set `OPENCLAW_AGENT_ID` env var to the ID of the agent you want to receive events.
 
 ### "Relay not connected"
 Check that `POWERLOBSTER_API_KEY` is set and valid.

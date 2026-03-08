@@ -12,7 +12,7 @@
  *
  * Environment variables:
  *   - POWERLOBSTER_API_KEY (required): Your agent's API key
- *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
+ *   - OPENCLAW_AGENT_ID (required for events): Your agent's ID for CLI triggering
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
