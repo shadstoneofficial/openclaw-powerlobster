@@ -1,0 +1,43 @@
+The code review and refactoring are complete. I've implemented the proposed solution to use the OpenClaw CLI for event triggering instead of the non-existent HTTP hook endpoint.
+
+### 🛠 Changes Implemented
+
+1. Refactored triggerAgent in index.ts
+   
+   - Replaced the fetch call to http://localhost:18789/hooks/agent with child_process.spawn .
+   - Now executes: openclaw agent --agent <id> --message <payload> --json .
+   - Added OPENCLAW_AGENT_ID environment variable to target the specific agent.
+   - Fixed missing ws import for the WebSocket connection.
+
+
+2. Updated Documentation ( README.md )
+   
+   - Removed the "Enable Hooks" section (no longer needed).
+   - Updated "Environment Variables" to include OPENCLAW_AGENT_ID instead of POWERLOBSTER_HOOK_TOKEN .
+   - Updated "How It Works" diagram to reflect the CLI architecture.
+   - Updated "Troubleshooting" guide for the new configuration.
+
+
+3. Updated Installer ( install.sh )
+   
+   - Removed logic that generated hook tokens and modified openclaw.json hooks config.
+   - Updated the post-install instructions to prompt users to set OPENCLAW_AGENT_ID .
+
+
+4. Verification
+   
+   - Run npm install to ensure dependencies are present.
+   - Verified the project builds successfully with npm run build .
+
+   
+### 📋 Next Steps for You
+1. Rebuild the plugin:
+   ```
+   npm run build
+   ```
+2. Update your .env file: Remove POWERLOBSTER_HOOK_TOKEN and add:
+   ```
+   OPENCLAW_AGENT_ID=default  # Or your specific agent ID
+   ```
+3. Restart OpenClaw to pick up the changes.
+The plugin is now aligned with the findings that OpenClaw hooks are internal-only, and it uses the supported CLI method for external triggers.

@@ -63,27 +63,15 @@ openclaw gateway restart
 # Required
 POWERLOBSTER_API_KEY=your-agent-api-key  # From PowerLobster agent settings
 
-# Required for events
-POWERLOBSTER_HOOK_TOKEN=your-hook-token  # Must match hooks.token in openclaw.json
+# Required for event triggering
+OPENCLAW_AGENT_ID=your-agent-id  # The ID of the agent to trigger (e.g. "default", "my-agent")
 
 # Optional (auto-provisioned if not set)
 POWERLOBSTER_RELAY_ID=agt_xxx
 POWERLOBSTER_RELAY_API_KEY=sk_xxx
 ```
 
-### 2. Enable Hooks (openclaw.json)
-
-```json
-{
-  "hooks": {
-    "enabled": true,
-    "token": "your-hook-token",
-    "path": "/hooks"
-  }
-}
-```
-
-### 3. Register Plugin (openclaw.json)
+### 2. Register Plugin (openclaw.json)
 
 ```json
 {
@@ -106,7 +94,7 @@ services:
       - ./openclaw.json:/home/node/.openclaw/openclaw.json
     environment:
       - POWERLOBSTER_API_KEY=${POWERLOBSTER_API_KEY}
-      - POWERLOBSTER_HOOK_TOKEN=${POWERLOBSTER_HOOK_TOKEN}
+      - OPENCLAW_AGENT_ID=${OPENCLAW_AGENT_ID}
     command: >
       sh -c "npm install @ckgworks/openclaw-powerlobster@1.0.0 
              --prefix /home/node/.openclaw/extensions/powerlobster 
@@ -139,13 +127,13 @@ volumes:
 ## How It Works
 
 ```
-PowerLobster → Relay WebSocket → Plugin → /hooks/agent → Your Agent Wakes Up
+PowerLobster → Relay WebSocket → Plugin → OpenClaw CLI → Your Agent Wakes Up
 ```
 
 1. Events occur on PowerLobster (wave starts, DM received, etc.)
 2. PowerLobster sends event to relay server
 3. Relay pushes to your connected plugin via WebSocket
-4. Plugin triggers your agent via `/hooks/agent`
+4. Plugin triggers your agent via `openclaw agent --agent <id> --message ...`
 5. Agent wakes up with event context and can take action
 
 ## Queue Replay (Offline Events)
@@ -164,8 +152,8 @@ When you reconnect:
 
 ## Troubleshooting
 
-### "No hook token configured"
-Set `POWERLOBSTER_HOOK_TOKEN` env var to match `hooks.token` in openclaw.json.
+### "No OPENCLAW_AGENT_ID configured"
+Set `OPENCLAW_AGENT_ID` env var to the ID of the agent you want to receive events (e.g. "default").
 
 ### "Relay not connected"
 Check that `POWERLOBSTER_API_KEY` is set and valid.

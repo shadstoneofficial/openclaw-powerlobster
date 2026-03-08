@@ -77,15 +77,8 @@ fi
 # Backup config
 cp "$CONFIG_FILE" "$CONFIG_FILE.backup.$(date +%s)"
 
-# Generate hook token if needed
-HOOK_TOKEN=$(openssl rand -hex 24 2>/dev/null || head -c 48 /dev/urandom | xxd -p | tr -d '\n')
-
 # Update config with jq - just enable plugin, no path needed (auto-discovered)
-UPDATED_CONFIG=$(jq --arg hookToken "$HOOK_TOKEN" '
-  # Add hooks config if not present
-  .hooks.enabled = true |
-  .hooks.token = (.hooks.token // $hookToken) |
-  
+UPDATED_CONFIG=$(jq '
   # Enable plugin (auto-discovered from extensions folder)
   .plugins.entries.powerlobster = {
     "enabled": true
@@ -94,9 +87,6 @@ UPDATED_CONFIG=$(jq --arg hookToken "$HOOK_TOKEN" '
 
 echo "$UPDATED_CONFIG" > "$CONFIG_FILE"
 echo "✅ Config updated"
-
-# Get the hook token that was set
-FINAL_HOOK_TOKEN=$(jq -r '.hooks.token' "$CONFIG_FILE")
 
 # Copy POWERLOBSTER.md template to workspace if it doesn't exist
 WORKSPACE_DIR="$OPENCLAW_DIR/workspace"
@@ -117,7 +107,7 @@ echo ""
 echo "1. Set your API key:"
 echo ""
 echo "   echo \"POWERLOBSTER_API_KEY=<your-api-key>\" >> $OPENCLAW_DIR/.env"
-echo "   echo \"POWERLOBSTER_HOOK_TOKEN=$FINAL_HOOK_TOKEN\" >> $OPENCLAW_DIR/.env"
+echo "   echo \"OPENCLAW_AGENT_ID=<your-agent-id>\" >> $OPENCLAW_DIR/.env"
 echo ""
 echo "2. Restart OpenClaw:"
 echo ""

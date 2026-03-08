@@ -14,10 +14,15 @@
  *   - POWERLOBSTER_API_KEY (required): Your agent's API key
  *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
  */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = plugin;
 const fs_1 = require("fs");
+const child_process_1 = require("child_process");
 const path_1 = require("path");
+const ws_1 = __importDefault(require("ws"));
 const CREDENTIALS_CACHE = (0, path_1.join)(process.env.HOME || "/root", ".openclaw", "powerlobster-relay.json");
 const POWERLOBSTER_API = "https://powerlobster.com/api";
 const RELAY_WS_URL = "wss://relay.powerlobster.com/api/v1/connect";
@@ -53,15 +58,13 @@ async function provisionRelay(apiKey) {
     }
     return response.json();
 }
-// Trigger agent via OpenClaw hooks
+// Trigger agent via OpenClaw CLI
 async function triggerAgent(event) {
-    const hookToken = process.env.POWERLOBSTER_HOOK_TOKEN || pluginCtx?.config?.hooks?.token;
-    if (!hookToken) {
-        console.error("🦞 [relay] No hook token configured, cannot trigger agent");
+    const agentId = process.env.OPENCLAW_AGENT_ID;
+    if (!agentId) {
+        console.error("🦞 [relay] No OPENCLAW_AGENT_ID configured, cannot trigger agent");
         return;
     }
-    const gatewayPort = pluginCtx?.config?.gateway?.port || 18789;
-    const gatewayHost = pluginCtx?.config?.gateway?.bind === "loopback" ? "127.0.0.1" : "localhost";
     // Read POWERLOBSTER.md config
     const config = readPowerLobsterConfig();
     // Build event message with config
@@ -71,27 +74,33 @@ async function triggerAgent(event) {
         eventMessage += `\n\n---\n[Your PowerLobster Config]\n${config}`;
     }
     try {
-        const hookUrl = `http://${gatewayHost}:${gatewayPort}/hooks/agent`;
-        console.log(`🦞 [relay] Triggering agent via ${hookUrl}`);
-        const response = await fetch(hookUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${hookToken}`,
-            },
-            body: JSON.stringify({
-                event: "powerlobster",
-                type: event.type,
-                message: eventMessage,
-                data: event.data,
-            }),
+        console.log(`🦞 [relay] Triggering agent ${agentId} via CLI`);
+        const payload = JSON.stringify({
+            event: "powerlobster",
+            type: event.type,
+            message: eventMessage,
+            data: event.data,
         });
-        if (!response.ok) {
-            console.error(`🦞 [relay] Hook trigger failed: ${response.status}`);
-        }
-        else {
-            console.log(`🦞 [relay] Agent triggered successfully`);
-        }
+        const child = (0, child_process_1.spawn)("openclaw", [
+            "agent",
+            "--agent", agentId,
+            "--message", payload,
+            "--json"
+        ]);
+        child.stdout.on('data', (data) => {
+            console.log(`🦞 [relay] CLI output: ${data}`);
+        });
+        child.stderr.on('data', (data) => {
+            console.error(`🦞 [relay] CLI error: ${data}`);
+        });
+        child.on('close', (code) => {
+            if (code !== 0) {
+                console.error(`🦞 [relay] CLI process exited with code ${code}`);
+            }
+            else {
+                console.log(`🦞 [relay] Agent triggered successfully`);
+            }
+        });
     }
     catch (error) {
         console.error(`🦞 [relay] Failed to trigger agent: ${error}`);
@@ -100,7 +109,7 @@ async function triggerAgent(event) {
 // Connect to PowerLobster relay WebSocket
 function connectRelay(credentials) {
     console.log("🦞 [relay] Connecting to relay.powerlobster.com...");
-    const ws = new WebSocket(RELAY_WS_URL);
+    const ws = new ws_1.default(RELAY_WS_URL);
     wsConnection = ws;
     ws.onopen = () => {
         console.log("🦞 [relay] WebSocket open, sending auth...");
@@ -368,7 +377,7 @@ const tools = [
         parameters: { type: "object", properties: {} },
         execute: async () => {
             return {
-                connected: wsConnection?.readyState === WebSocket.OPEN,
+                connected: wsConnection?.readyState === ws_1.default.OPEN,
                 relay_id: relayCredentials?.relay_id || null,
                 webhook_url: relayCredentials?.webhook_url || null,
             };

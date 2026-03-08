@@ -11,11 +11,13 @@
  * 
  * Environment variables:
  *   - POWERLOBSTER_API_KEY (required): Your agent's API key
- *   - POWERLOBSTER_HOOK_TOKEN (required for events): Token to trigger agent via /hooks
+ *   - OPENCLAW_AGENT_ID (required for events): Your agent's ID for CLI triggering
  */
 
 import { readFileSync, existsSync, writeFileSync } from "fs";
+import { spawn } from "child_process";
 import { join } from "path";
+import WebSocket from "ws";
 
 const CREDENTIALS_CACHE = join(process.env.HOME || "/root", ".openclaw", "powerlobster-relay.json");
 
@@ -89,16 +91,13 @@ async function provisionRelay(apiKey: string): Promise<RelayCredentials> {
   return response.json() as Promise<RelayCredentials>;
 }
 
-// Trigger agent via OpenClaw hooks
+// Trigger agent via OpenClaw CLI
 async function triggerAgent(event: PowerLobsterEvent): Promise<void> {
-  const hookToken = process.env.POWERLOBSTER_HOOK_TOKEN || pluginCtx?.config?.hooks?.token;
-  if (!hookToken) {
-    console.error("🦞 [relay] No hook token configured, cannot trigger agent");
+  const agentId = process.env.OPENCLAW_AGENT_ID;
+  if (!agentId) {
+    console.error("🦞 [relay] No OPENCLAW_AGENT_ID configured, cannot trigger agent");
     return;
   }
-  
-  const gatewayPort = pluginCtx?.config?.gateway?.port || 18789;
-  const gatewayHost = pluginCtx?.config?.gateway?.bind === "loopback" ? "127.0.0.1" : "localhost";
   
   // Read POWERLOBSTER.md config
   const config = readPowerLobsterConfig();
@@ -112,28 +111,38 @@ async function triggerAgent(event: PowerLobsterEvent): Promise<void> {
   }
   
   try {
-    const hookUrl = `http://${gatewayHost}:${gatewayPort}/hooks/agent`;
-    console.log(`🦞 [relay] Triggering agent via ${hookUrl}`);
+    console.log(`🦞 [relay] Triggering agent ${agentId} via CLI`);
     
-    const response = await fetch(hookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${hookToken}`,
-      },
-      body: JSON.stringify({
-        event: "powerlobster",
-        type: event.type,
-        message: eventMessage,
-        data: event.data,
-      }),
+    const payload = JSON.stringify({
+      event: "powerlobster",
+      type: event.type,
+      message: eventMessage,
+      data: event.data,
+    });
+
+    const child = spawn("openclaw", [
+      "agent", 
+      "--agent", agentId,
+      "--message", payload,
+      "--json"
+    ]);
+
+    child.stdout.on('data', (data) => {
+      console.log(`🦞 [relay] CLI output: ${data}`);
+    });
+
+    child.stderr.on('data', (data) => {
+      console.error(`🦞 [relay] CLI error: ${data}`);
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`🦞 [relay] CLI process exited with code ${code}`);
+      } else {
+        console.log(`🦞 [relay] Agent triggered successfully`);
+      }
     });
     
-    if (!response.ok) {
-      console.error(`🦞 [relay] Hook trigger failed: ${response.status}`);
-    } else {
-      console.log(`🦞 [relay] Agent triggered successfully`);
-    }
   } catch (error) {
     console.error(`🦞 [relay] Failed to trigger agent: ${error}`);
   }
