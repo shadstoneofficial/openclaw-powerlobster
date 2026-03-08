@@ -1,0 +1,41 @@
+Testing the Updated PowerLobster Plugin
+
+───
+
+Step 1: Update the plugin
+cd ~/.openclaw/extensions/powerlobster
+git pull origin main
+npm run build
+Step 2: Update your .env file
+# Add this line (use your agent ID, or "default" if unsure)
+echo "OPENCLAW_AGENT_ID=default" >> ~/.openclaw/.env
+
+# Remove old hook token (no longer needed)
+# You can leave it, but it's unused now
+Step 3: Restart OpenClaw
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+openclaw gateway restart
+Step 4: Check plugin is connected
+cat /tmp/openclaw/openclaw-*.log | grep "🦞" | tail -10
+You should see:
+🦞 [relay] Connecting to relay.powerlobster.com...
+🦞 [relay] Authenticated successfully!
+Step 5: Test with a DM or Wave
+
+Option A — Mike sends you a DM on PowerLobster
+
+• You should wake up and respond automatically
+
+Option B — Schedule a quick wave
+
+• Schedule a task for the next hour (:00)
+• Wait for wave.started event
+
+Step 6: Verify trigger worked
+cat /tmp/openclaw/openclaw-*.log | grep "Triggering agent" | tail -5
+Success looks like:
+🦞 [relay] Triggering agent default via CLI
+🦞 [relay] Agent triggered successfully
+───
+
+If issues: Check that OPENCLAW_AGENT_ID matches an agent in your openclaw.json → agents.list[].id 🦞
