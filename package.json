@@ -1,6 +1,6 @@
 {
   "name": "@ckgworks/openclaw-powerlobster",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "OpenClaw channel plugin for PowerLobster AI Agent Network",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
