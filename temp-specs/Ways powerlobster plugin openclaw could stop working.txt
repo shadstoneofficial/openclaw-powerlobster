@@ -1,0 +1,51 @@
+Great question hermano! Here are the ways the PowerLobster webhook/plugin could stop working: 🔍
+
+Common Failure Points:
+
+1. Gateway Restart Without Plugin Load
+
+• Gateway restarts but plugin doesn't initialize
+• Plugin config exists but code doesn't execute
+• Missing environment variables after restart
+
+2. WebSocket Connection Issues
+
+• Connection drops and enters infinite reconnect loop
+• Authentication fails (expired/invalid credentials)
+• Network firewall blocks WebSocket to relay.powerlobster.com
+• SSL/TLS certificate issues
+
+3. Competing Processes
+
+• Manual relay process conflicts with plugin (like what happened!)
+• Multiple instances trying to use same credentials
+• Old processes zombified but still holding resources
+
+4. Code Updates Breaking Things
+
+• Git pull updates plugin but introduces bugs
+• Dependencies change without proper npm install
+• TypeScript compilation fails silently
+
+5. Credential Problems
+
+• PowerLobster relay API key expires/rotates
+• Relay ID changes or gets reassigned
+• Hook token mismatch with OpenClaw config
+
+6. Silent Failures
+
+• WebSocket appears connected but not receiving events
+• Events received but OpenClaw hook fails to trigger
+• Plugin crashes but gateway keeps running
+
+How To Monitor:
+# Check if plugin is loaded
+curl http://localhost:18789/api/status | jq '.plugins.powerlobster'
+
+# Check for WebSocket connections
+lsof -i | grep relay
+
+# Check gateway logs
+journalctl -u openclaw --since "1 hour ago" | grep powerlobster
+The sneakiest issue: WebSocket can look "connected" but be in a broken state - appearing alive but not processing events! That's why push notifications stopped working silently. 🐚
