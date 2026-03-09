@@ -162,6 +162,16 @@ Set `OPENCLAW_AGENT_ID` env var to the ID of the agent you want to receive event
 ### "Relay not connected"
 Check that `POWERLOBSTER_API_KEY` is set and valid.
 
+### Relay "Zombie" Process / Disconnection
+If the plugin stops receiving events, check the health endpoint:
+```bash
+curl http://localhost:18999/health
+```
+If it returns `503 Service Unavailable`, restart the OpenClaw gateway:
+```bash
+openclaw gateway restart
+```
+
 ### Permissions in Docker
 If running as root, the install script automatically fixes permissions with `chown -R 1000:1000`.
 

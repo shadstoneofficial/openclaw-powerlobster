@@ -18,8 +18,10 @@ import { readFileSync, existsSync, writeFileSync } from "fs";
 import { spawn } from "child_process";
 import { join } from "path";
 import WebSocket from "ws";
+import http from "http";
 
 const CREDENTIALS_CACHE = join(process.env.HOME || "/root", ".openclaw", "powerlobster-relay.json");
+const HEALTH_PORT = parseInt(process.env.POWERLOBSTER_HEALTH_PORT || "18999");
 
 interface PluginContext {
   logger: {
@@ -58,6 +60,33 @@ const RELAY_WS_URL = "wss://relay.powerlobster.com/api/v1/connect";
 let relayCredentials: RelayCredentials | null = null;
 let wsConnection: WebSocket | null = null;
 let pluginCtx: PluginContext | null = null;
+let lastHeartbeat = Date.now();
+
+// Health check server
+function startHealthServer() {
+  const server = http.createServer((req, res) => {
+    if (req.url === "/health") {
+      const isConnected = wsConnection?.readyState === WebSocket.OPEN;
+      const timeSinceHeartbeat = Date.now() - lastHeartbeat;
+      const isHealthy = isConnected && timeSinceHeartbeat < 120000; // 2 mins tolerance
+
+      res.writeHead(isHealthy ? 200 : 503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        status: isHealthy ? "ok" : "unhealthy",
+        connected: isConnected,
+        last_heartbeat_ago: Math.floor(timeSinceHeartbeat / 1000) + "s",
+        relay_id: relayCredentials?.relay_id
+      }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+
+  server.listen(HEALTH_PORT, "127.0.0.1", () => {
+    console.log(`🦞 [relay] Health check running on port ${HEALTH_PORT}`);
+  });
+}
 
 // Read POWERLOBSTER.md config from workspace
 function readPowerLobsterConfig(): string | null {
@@ -226,6 +255,7 @@ function connectRelay(credentials: RelayCredentials): void {
       
       // Handle PowerLobster events
       console.log(`🦞 [relay] Event received: ${msg.type}`, JSON.stringify(msg.data || msg));
+      lastHeartbeat = Date.now(); // Update heartbeat on any message
       triggerAgent(msg);
       
     } catch (error) {
@@ -1095,8 +1125,9 @@ export default function plugin(ctx: PluginContext) {
   
   // Initialize relay in background
   initRelay();
+  startHealthServer();
   
-  console.log("🦞 PowerLobster plugin registered (tools + relay)");
+  console.log("🦞 PowerLobster plugin registered (tools + relay + health check)");
   
   return { tools };
 }

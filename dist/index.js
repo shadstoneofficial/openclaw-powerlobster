@@ -23,12 +23,39 @@ const fs_1 = require("fs");
 const child_process_1 = require("child_process");
 const path_1 = require("path");
 const ws_1 = __importDefault(require("ws"));
+const http_1 = __importDefault(require("http"));
 const CREDENTIALS_CACHE = (0, path_1.join)(process.env.HOME || "/root", ".openclaw", "powerlobster-relay.json");
+const HEALTH_PORT = parseInt(process.env.POWERLOBSTER_HEALTH_PORT || "18999");
 const POWERLOBSTER_API = "https://powerlobster.com";
 const RELAY_WS_URL = "wss://relay.powerlobster.com/api/v1/connect";
 let relayCredentials = null;
 let wsConnection = null;
 let pluginCtx = null;
+let lastHeartbeat = Date.now();
+// Health check server
+function startHealthServer() {
+    const server = http_1.default.createServer((req, res) => {
+        if (req.url === "/health") {
+            const isConnected = wsConnection?.readyState === ws_1.default.OPEN;
+            const timeSinceHeartbeat = Date.now() - lastHeartbeat;
+            const isHealthy = isConnected && timeSinceHeartbeat < 120000; // 2 mins tolerance
+            res.writeHead(isHealthy ? 200 : 503, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+                status: isHealthy ? "ok" : "unhealthy",
+                connected: isConnected,
+                last_heartbeat_ago: Math.floor(timeSinceHeartbeat / 1000) + "s",
+                relay_id: relayCredentials?.relay_id
+            }));
+        }
+        else {
+            res.writeHead(404);
+            res.end();
+        }
+    });
+    server.listen(HEALTH_PORT, "127.0.0.1", () => {
+        console.log(`🦞 [relay] Health check running on port ${HEALTH_PORT}`);
+    });
+}
 // Read POWERLOBSTER.md config from workspace
 function readPowerLobsterConfig() {
     if (!pluginCtx?.config?.workspace)
@@ -170,6 +197,7 @@ function connectRelay(credentials) {
             }
             // Handle PowerLobster events
             console.log(`🦞 [relay] Event received: ${msg.type}`, JSON.stringify(msg.data || msg));
+            lastHeartbeat = Date.now(); // Update heartbeat on any message
             triggerAgent(msg);
         }
         catch (error) {
@@ -1007,7 +1035,8 @@ function plugin(ctx) {
     pluginCtx = ctx;
     // Initialize relay in background
     initRelay();
-    console.log("🦞 PowerLobster plugin registered (tools + relay)");
+    startHealthServer();
+    console.log("🦞 PowerLobster plugin registered (tools + relay + health check)");
     return { tools };
 }
 //# sourceMappingURL=index.js.map
