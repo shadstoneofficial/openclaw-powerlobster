@@ -4,7 +4,7 @@
 
 set -e
 
-REPO_URL="https://github.com/shadstoneofficial/openclaw-powerlobster"
+REPO_URL="https://github.com/shadstoneofficial/openclaw-powerlobster.git"
 OPENCLAW_DIR="${OPENCLAW_DIR:-$HOME/.openclaw}"
 EXTENSIONS_DIR="$OPENCLAW_DIR/extensions"
 PLUGIN_DIR="$EXTENSIONS_DIR/powerlobster"
@@ -19,10 +19,11 @@ echo ""
 # STEP 0: Prerequisites - API Key Required
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# Check if POWERLOBSTER_API_KEY is provided as environment variable
 if [ -z "$POWERLOBSTER_API_KEY" ]; then
-    # Check if already in .env
+    # Try to read from existing .env file
     if [ -f "$ENV_FILE" ]; then
-        POWERLOBSTER_API_KEY=$(grep "^POWERLOBSTER_API_KEY=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+        POWERLOBSTER_API_KEY=$(grep "^POWERLOBSTER_API_KEY=" "$ENV_FILE" | cut -d '=' -f2 | tr -d '"' | tr -d "'")
     fi
 fi
 
@@ -48,8 +49,9 @@ echo "✅ API Key found"
 
 echo "🔑 Fetching relay credentials from PowerLobster..."
 
-RELAY_RESPONSE=$(curl -s "https://powerlobster.com/api/agent/relay" \
-    -H "Authorization: Bearer $POWERLOBSTER_API_KEY")
+RELAY_RESPONSE=$(curl -s -X POST "https://powerlobster.com/api/agent/relay" \
+    -H "Authorization: Bearer $POWERLOBSTER_API_KEY" \
+    -H "Content-Type: application/json")
 
 # Check for errors
 if echo "$RELAY_RESPONSE" | grep -q '"error"'; then
@@ -63,14 +65,14 @@ RELAY_API_KEY=$(echo "$RELAY_RESPONSE" | jq -r '.relay_api_key // empty')
 
 if [ -z "$RELAY_ID" ] || [ -z "$RELAY_API_KEY" ]; then
     echo "❌ Could not extract relay credentials from response:"
-    echo "$RELAY_RESPONSE" | jq .
+    echo "$RELAY_RESPONSE"
     echo ""
     echo "Make sure your agent has relay enabled in PowerLobster settings."
     exit 1
 fi
 
 echo "✅ Relay ID: $RELAY_ID"
-echo "✅ Relay API Key: ${RELAY_API_KEY:0:20}..."
+echo "✅ Relay API Key: ${RELAY_API_KEY:0:10}..."
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # STEP 2: Check Dependencies
@@ -82,19 +84,23 @@ if ! command -v npm &> /dev/null; then
 fi
 
 if ! command -v jq &> /dev/null; then
-    echo "📦 Installing jq..."
-    apt-get update -qq && apt-get install -y -qq jq 2>/dev/null || {
-        echo "❌ Could not install jq. Please install it manually."
+    if command -v apt-get &> /dev/null; then
+        echo "📦 Installing jq..."
+        sudo apt-get update -qq && sudo apt-get install -y -qq jq
+    else
+        echo "❌ jq is required but not found. Please install it manually."
         exit 1
-    }
+    fi
 fi
 
 if ! command -v git &> /dev/null; then
-    echo "📦 Installing git..."
-    apt-get update -qq && apt-get install -y -qq git 2>/dev/null || {
-        echo "❌ Could not install git. Please install it manually."
+    if command -v apt-get &> /dev/null; then
+        echo "📦 Installing git..."
+        sudo apt-get update -qq && sudo apt-get install -y -qq git
+    else
+        echo "❌ git is required but not found. Please install it manually."
         exit 1
-    }
+    fi
 fi
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -107,10 +113,16 @@ if [ -d "$PLUGIN_DIR" ]; then
 fi
 
 echo "📦 Installing plugin from GitHub..."
-git clone --depth 1 "$REPO_URL.git" "$PLUGIN_DIR" 2>/dev/null
+git clone --depth 1 "$REPO_URL" "$PLUGIN_DIR"
 
 cd "$PLUGIN_DIR"
-npm install --production 2>/dev/null
+npm install --production --no-audit --no-fund
+
+# Build plugin if typescript source exists but dist doesn't
+if [ -f "tsconfig.json" ] && [ ! -d "dist" ]; then
+    echo "🔨 Building plugin..."
+    npm run build
+fi
 
 if [ ! -f "$PLUGIN_DIR/dist/index.js" ]; then
     echo "❌ Installation failed - dist/index.js not found"
@@ -118,28 +130,29 @@ if [ ! -f "$PLUGIN_DIR/dist/index.js" ]; then
 fi
 echo "✅ Plugin installed"
 
-# Fix permissions
-CURRENT_UID=$(id -u)
-CURRENT_GID=$(id -g)
-chown -R "$CURRENT_UID:$CURRENT_GID" "$PLUGIN_DIR"
+# Fix permissions if running as root but user exists
+if [ "$(id -u)" = "0" ] && [ -n "$SUDO_USER" ]; then
+    chown -R "$SUDO_USER" "$PLUGIN_DIR"
+fi
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # STEP 4: Configure openclaw.json
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "❌ Config file not found: $CONFIG_FILE"
-    echo "   Run 'openclaw configure' first."
-    exit 1
+    echo "⚠️  Config file not found: $CONFIG_FILE"
+    echo "   Creating default config..."
+    mkdir -p "$OPENCLAW_DIR"
+    echo '{ "plugins": { "entries": {} } }' > "$CONFIG_FILE"
 fi
 
+# Create backup
 cp "$CONFIG_FILE" "$CONFIG_FILE.backup.$(date +%s)"
 
-UPDATED_CONFIG=$(jq '
-  .plugins.entries.powerlobster = {"enabled": true}
-' "$CONFIG_FILE")
+# Use temporary file for jq output
+TMP_CONFIG=$(mktemp)
+jq '.plugins.entries.powerlobster = {"enabled": true}' "$CONFIG_FILE" > "$TMP_CONFIG" && mv "$TMP_CONFIG" "$CONFIG_FILE"
 
-echo "$UPDATED_CONFIG" > "$CONFIG_FILE"
 echo "✅ openclaw.json updated"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -155,9 +168,10 @@ touch "$ENV_FILE"
 update_env() {
     local key="$1"
     local value="$2"
-    if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
-        # Update existing
-        sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+    if grep -q "^${key}=" "$ENV_FILE"; then
+        # Update existing (using temporary file for sed compatibility)
+        local tmp_env=$(mktemp)
+        sed "s|^${key}=.*|${key}=${value}|" "$ENV_FILE" > "$tmp_env" && mv "$tmp_env" "$ENV_FILE"
     else
         # Add new
         echo "${key}=${value}" >> "$ENV_FILE"
@@ -169,7 +183,7 @@ update_env "POWERLOBSTER_RELAY_ID" "$RELAY_ID"
 update_env "POWERLOBSTER_RELAY_API_KEY" "$RELAY_API_KEY"
 
 # Set default agent ID if not already set
-if ! grep -q "^OPENCLAW_AGENT_ID=" "$ENV_FILE" 2>/dev/null; then
+if ! grep -q "^OPENCLAW_AGENT_ID=" "$ENV_FILE"; then
     update_env "OPENCLAW_AGENT_ID" "main"
     echo "✅ Set OPENCLAW_AGENT_ID=main (change if needed)"
 fi
@@ -181,7 +195,10 @@ echo "✅ Credentials saved to $ENV_FILE"
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 WORKSPACE_DIR="$OPENCLAW_DIR/workspace"
-if [ -d "$WORKSPACE_DIR" ] && [ ! -f "$WORKSPACE_DIR/POWERLOBSTER.md" ]; then
+# Create workspace dir if it doesn't exist
+mkdir -p "$WORKSPACE_DIR"
+
+if [ ! -f "$WORKSPACE_DIR/POWERLOBSTER.md" ]; then
     if [ -f "$PLUGIN_DIR/POWERLOBSTER.template.md" ]; then
         cp "$PLUGIN_DIR/POWERLOBSTER.template.md" "$WORKSPACE_DIR/POWERLOBSTER.md"
         echo "✅ Created POWERLOBSTER.md in workspace"
@@ -200,7 +217,7 @@ echo ""
 echo "Credentials saved:"
 echo "  • POWERLOBSTER_API_KEY"
 echo "  • POWERLOBSTER_RELAY_ID=$RELAY_ID"
-echo "  • POWERLOBSTER_RELAY_API_KEY=sk_..."
+echo "  • POWERLOBSTER_RELAY_API_KEY=${RELAY_API_KEY:0:10}..."
 echo "  • OPENCLAW_AGENT_ID=main"
 echo ""
 echo "📋 FINAL STEP - Restart OpenClaw:"
