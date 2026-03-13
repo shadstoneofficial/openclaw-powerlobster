@@ -11,8 +11,15 @@ PLUGIN_DIR="$EXTENSIONS_DIR/powerlobster"
 CONFIG_FILE="$OPENCLAW_DIR/openclaw.json"
 ENV_FILE="$OPENCLAW_DIR/.env"
 
-echo "🦞 PowerLobster Plugin Installer v0.5.1"
-echo "========================================"
+echo "🦞 PowerLobster Plugin Installer (LEGACY)"
+echo "========================================="
+echo ""
+echo "⚠️  WARNING: THIS PLUGIN IS DEPRECATED!"
+echo "   Please upgrade to the new channel integration:"
+echo "   https://github.com/shadstoneofficial/powerlobster"
+echo ""
+echo "   Continuing in 5 seconds... (Ctrl+C to cancel)"
+sleep 5
 echo ""
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
